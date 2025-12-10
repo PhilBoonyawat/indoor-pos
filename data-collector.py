@@ -3,7 +3,7 @@ from datetime import datetime
 import sys
 
 def scan_for_networks():
-    client = CWWiFiClient.shared()
+    client = CWWiFiClient.sharedWiFiClient()
     wifi_iface = client.interface()
     print(wifi_iface.interfaceName)
     scans, scan_err = wifi_iface.scanForNetworksWithName_error_(None, None)
