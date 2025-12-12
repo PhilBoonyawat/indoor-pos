@@ -5,7 +5,6 @@ import csv
 import os
 import argparse
 
-
 def scan_for_networks(location):
     client = CWWiFiClient.sharedWiFiClient()
     wifi_iface = client.interface()
