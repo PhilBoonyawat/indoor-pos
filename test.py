@@ -1,30 +1,3 @@
-# from CoreLocation import CLLocationManager
-# from Foundation import NSObject
-
-
-# class LocationDelegate(NSObject):
-
-#     def locationManager_didUpdateLocations_(self, manager, locations):
-#         location = locations[-1]   
-#         coord = location.coordinate()
-#         print(f"Latitude: {coord.latitude}, Longitude: {coord.longitude}")
-
-#     def locationManager_didFailWithError_(self, manager, error):
-#         print("Location failed:", error.localizedDescription())
-
-    
-
-# def retrieve_current_location():
-#     location_manager = CLLocationManager.alloc().init()
-#     location_manager_delegate = LocationDelegate.alloc().init()
-#     location_manager.setDelegate_(location_manager_delegate)
-#     print(location_manager.locationServicesEnabled())
-#     location_manager.startUpdatingLocation()
-
-# if __name__ == "__main__":
-#     retrieve_current_location()
-
-
 import AppKit
 import CoreLocation
 import Foundation
@@ -49,15 +22,11 @@ def retrieve_current_location():
     manager = CoreLocation.CLLocationManager.alloc().init()
     delegate = LocationDelegate.alloc().init()
 
-    # Keep references alive
-    retrieve_current_location.manager = manager
-    retrieve_current_location.delegate = delegate
-
     manager.setDelegate_(delegate)
+
+    # this should prompt permission access if in infoplist
     manager.requestWhenInUseAuthorization()
     manager.startUpdatingLocation()
 
-    AppKit.NSApp.run()
-
-if __name__ == "__main__":
-    retrieve_current_location()
+    # AppKit.NSApp.run()
+    app.run()
