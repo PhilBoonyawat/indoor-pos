@@ -9,14 +9,11 @@ from db_service import init_db, store_raw_scan
 
 
 def scan_for_networks(location, orientation):
-    print("hi")
     currentCoords = retrieve_current_location()
     latitude, longitude = currentCoords
-    print("hi")
     
     client = CWWiFiClient.sharedWiFiClient()
     wifi_iface = client.interface()
-    print(wifi_iface.interfaceName)
     scans, scan_err = wifi_iface.scanForNetworksWithName_error_(None, None)
 
     if scan_err:
@@ -29,20 +26,9 @@ def scan_for_networks(location, orientation):
         now = datetime.now().isoformat()
         # slow
         if scan.bssid() in bssid_set:
-            print("duplication: " + str(scan.bssid()))
             continue
         bssid_set.add(scan.bssid())
         counter += 1
-        print(
-            "SSID:", scan.ssid(),
-            "BSSID:", scan.bssid(),
-            "RSSI:", scan.rssiValue(),
-            "Noise:", scan.noiseMeasurement(),
-            "Channel:", scan.wlanChannel().channelNumber(),
-            "Current Time:", now,
-            "latitude: ", latitude,
-            "longitude: ", longitude
-        )
         scan_data.append({
             'ssid': scan.ssid(),
             'bssid': scan.bssid(),
