@@ -144,7 +144,6 @@ def write_data_to_db():
     
 
 if __name__ == "__main__":
-    # write_data_to_csv()
     write_data_to_db()
 
 
