@@ -5,6 +5,7 @@ import sys
 import csv
 import os
 import argparse
+from db_service import init_db, store_raw_scan
 
 
 def scan_for_networks(location, orientation):
@@ -117,8 +118,47 @@ def write_data_to_csv():
             writer.writeheader()
         writer.writerows(scan_data)
 
+def write_data_to_db():
+    args = parse_args()
+
+    location = args.location
+    if not location:
+        try:
+            location = input("Enter your current location: ").strip()
+        except EOFError:
+            location = ""
+    if not location:
+        print("Location is required.", file=sys.stderr)
+        return 3
+    
+    orientation = args.orientation
+    if not orientation:
+        try:
+            orientation = input("Enter your orientation: ").strip()
+        except EOFError:
+            orientation = ""
+    if not orientation:
+        print("Orientation is required.", file=sys.stderr)
+        return 4
+
+    
+    try:
+        scan_data = scan_for_networks(location, orientation)
+    except RuntimeError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print("[FATAL] Unexpected error occurred", file=sys.stderr)
+        print(f"        {e}", file=sys.stderr)
+        sys.exit(2)
+
+    conn = init_db()
+    store_raw_scan(conn, scan_data)
+       
+    
 
 if __name__ == "__main__":
-    write_data_to_csv()
+    # write_data_to_csv()
+    write_data_to_db()
 
 
