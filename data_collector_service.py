@@ -8,12 +8,10 @@ import argparse
 
 
 def scan_for_networks(location, orientation):
+    print("hi")
     currentCoords = retrieve_current_location()
-
-    if (currentCoords is None):
-        raise Exception("Unable to retrieve current coordinates.")
-    
     latitude, longitude = currentCoords
+    print("hi")
     
     client = CWWiFiClient.sharedWiFiClient()
     wifi_iface = client.interface()
@@ -102,9 +100,13 @@ def write_data_to_csv():
     
     try:
         scan_data = scan_for_networks(location, orientation)
-    except Exception as e:
-        print(f"Error during Wi-Fi scan: {e}", file=sys.stderr)
+    except RuntimeError as e:
+        print(f"[ERROR] {e}", file=sys.stderr)
         sys.exit(1)
+    except Exception as e:
+        print("[FATAL] Unexpected error occurred", file=sys.stderr)
+        print(f"        {e}", file=sys.stderr)
+        sys.exit(2)
 
     file_exists = os.path.exists(output_file)
        

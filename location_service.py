@@ -1,12 +1,16 @@
-import AppKit
 import CoreLocation
 import Foundation
 import objc
 
 class LocationDelegate(Foundation.NSObject):
-    def __init__(self):
-        objc.super(LocationDelegate, self).init()
+    def init(self):
+        self = objc.super(LocationDelegate, self).init()
+        if self is None:
+            return None
+
         self.coordinates = None
+        self.error = None
+        return self
 
     def locationManager_didUpdateLocations_(self, manager, locations):
         loc = locations[-1]
@@ -16,17 +20,17 @@ class LocationDelegate(Foundation.NSObject):
 
         # Stop after first update if you want "current location"
         manager.stopUpdatingLocation()
-        AppKit.NSApp.terminate_(None)
+        Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
+
 
     def locationManager_didFailWithError_(self, manager, error):
-        print(f"Error: {error.localizedDescription()}")
         self.coordinates = None
-        AppKit.NSApp.terminate_(None)
+        self.error = error.localizedDescription()
+        manager.stopUpdatingLocation()
+        Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
 
-
+        
 def retrieve_current_location():
-    app = AppKit.NSApplication.sharedApplication()
-
     manager = CoreLocation.CLLocationManager.alloc().init()
     delegate = LocationDelegate.alloc().init()
 
@@ -36,7 +40,12 @@ def retrieve_current_location():
     manager.requestWhenInUseAuthorization()
     manager.startUpdatingLocation()
 
-    app.run()
+    Foundation.CFRunLoopRun()
+
+    if delegate.error:
+        raise RuntimeError(f"Location error: {delegate.error}")
+
+    if delegate.coordinates is None:
+        raise RuntimeError("Location unavailable")
 
     return delegate.coordinates
-
