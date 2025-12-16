@@ -1,3 +1,4 @@
+DateTime==6.0
 pyobjc==12.1
 pyobjc-core==12.1
 pyobjc-framework-Accessibility==12.1
