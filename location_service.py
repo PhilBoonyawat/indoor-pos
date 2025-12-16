@@ -1,11 +1,17 @@
 import AppKit
 import CoreLocation
 import Foundation
+import objc
 
 class LocationDelegate(Foundation.NSObject):
+    def __init__(self):
+        objc.super(LocationDelegate, self).init()
+        self.coordinates = None
+
     def locationManager_didUpdateLocations_(self, manager, locations):
         loc = locations[-1]
         coord = loc.coordinate()
+        self.coordinates = [coord.latitude, coord.longitude]
         print(coord.latitude, coord.longitude)
 
         # Stop after first update if you want "current location"
@@ -13,8 +19,10 @@ class LocationDelegate(Foundation.NSObject):
         AppKit.NSApp.terminate_(None)
 
     def locationManager_didFailWithError_(self, manager, error):
-        print(error.localizedDescription())
+        print(f"Error: {error.localizedDescription()}")
+        self.coordinates = None
         AppKit.NSApp.terminate_(None)
+
 
 def retrieve_current_location():
     app = AppKit.NSApplication.sharedApplication()
@@ -28,5 +36,7 @@ def retrieve_current_location():
     manager.requestWhenInUseAuthorization()
     manager.startUpdatingLocation()
 
-    # AppKit.NSApp.run()
     app.run()
+
+    return delegate.coordinates
+
