@@ -140,6 +140,7 @@ def write_data_to_db():
 
     conn = init_db()
     store_raw_scan(conn, scan_data)
+    conn.close()
        
     
 

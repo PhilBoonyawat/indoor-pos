@@ -1,8 +1,8 @@
 import time
 import subprocess
 
-LOCATION = "(S)7.03"
-ORIENTATION = "170 S"
+LOCATION = "(S)7.05"
+ORIENTATION = "43 NE"
 
 i = 0
 while i < 10:
@@ -20,6 +20,6 @@ while i < 10:
     i += 1
     print("done")
 
-    print("Sleeping for 5 seconds...\n")
-    time.sleep(5)
+    print("Sleeping for 3 seconds...\n")
+    time.sleep(3)
 print("YAYYYYYYY")
