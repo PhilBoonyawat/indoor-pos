@@ -1,8 +1,8 @@
 import time
 import subprocess
 
-LOCATION = "(S)7.05"
-ORIENTATION = "43 NE"
+LOCATION = "(S)7.03"
+ORIENTATION = "162 S"
 
 i = 0
 while i < 10:
