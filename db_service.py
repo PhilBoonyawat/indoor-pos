@@ -3,22 +3,35 @@ import uuid
 
 def init_db(db_path="wifi_scans.db"):
     conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
     cur = conn.cursor()
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS wifi_raw (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        scan_id TEXT,
-        ssid TEXT,
-        bssid TEXT,
-        rssi INTEGER,
-        noise INTEGER,
-        channel INTEGER,
+    CREATE TABLE IF NOT EXISTS scan_metadata (
+        scan_id TEXT PRIMARY KEY,
         timestamp TEXT,
         location TEXT,
         latitude REAL,
         longitude REAL,
         orientation TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS ssid (
+        bssid TEXT PRIMARY KEY,
+        ssid TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS wifi_scan (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scan_id TEXT REFERENCES scan_metadata(scan_id),
+        bssid TEXT REFERENCES ssid(bssid),
+        rssi INTEGER,
+        noise INTEGER,
+        channel INTEGER
     );
     """)
 
@@ -28,32 +41,28 @@ def init_db(db_path="wifi_scans.db"):
 
 def store_raw_scan(conn, scan_data):
     cur = conn.cursor()
-
     scan_id = str(uuid.uuid4())
 
-    rows = [
-        (
-            scan_id,
-            row["ssid"],
-            row["bssid"],
-            row["rssi"],
-            row["noise"],
-            row["channel"],
-            row["timestamp"],
-            row["location"],
-            row["latitude"],
-            row["longitude"],
-            row["orientation"]
-        )
-        for row in scan_data
-    ]
+    # 1. Insert scan metadata (same for all rows in this scan)
+    first = scan_data[0]
+    cur.execute("""
+        INSERT INTO scan_metadata (scan_id, timestamp, location, latitude, longitude, orientation)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (scan_id, first["timestamp"], first["location"],
+          first["latitude"], first["longitude"], first["orientation"]))
 
+    # 2. Insert unique BSSIDs into ssid table
+    for row in scan_data:
+        cur.execute("""
+            INSERT OR IGNORE INTO ssid (bssid, ssid)
+            VALUES (?, ?)
+        """, (row["bssid"], row["ssid"]))
+
+    # 3. Insert wifi scan results
     cur.executemany("""
-        INSERT INTO wifi_raw
-        (scan_id, ssid, bssid, rssi, noise, channel, timestamp,
-         location, latitude, longitude, orientation)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, rows)
+        INSERT INTO wifi_scan (scan_id, bssid, rssi, noise, channel)
+        VALUES (?, ?, ?, ?, ?)
+    """, [(scan_id, r["bssid"], r["rssi"], r["noise"], r["channel"]) for r in scan_data])
 
     conn.commit()
     return scan_id
