@@ -1,11 +1,14 @@
 from CoreWLAN import CWWiFiClient
 from datetime import datetime
-from location_service import retrieve_current_location
+from datacollection.location_service import retrieve_current_location
 import sys
 import csv
-import os
 import argparse
-from db_service import init_db, store_raw_scan
+from datacollection.db_service import init_db, store_raw_scan
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CSV = PROJECT_ROOT / "data" / "raw" / "wifi_scans.csv"
 
 
 def scan_for_networks(location, orientation):
@@ -22,8 +25,8 @@ def scan_for_networks(location, orientation):
     scan_data = []
     bssid_set = set()
     counter = 0
+    now = datetime.now().isoformat()
     for scan in scans:
-        now = datetime.now().isoformat()
         # slow
         if scan.bssid() in bssid_set:
             continue
@@ -48,103 +51,72 @@ def scan_for_networks(location, orientation):
 def parse_args():
     p = argparse.ArgumentParser(description="Collect Wi‑Fi scan data to CSV")
     p.add_argument("-l", "--location", help="Location in the building in which you are in")
-    p.add_argument("-o", "--out", default="test.csv", help="Output CSV file (default: wifi_scans.csv)")
+    p.add_argument("-o", "--out", default=DEFAULT_CSV, help="Output CSV file (default: wifi_scans.csv)")
     p.add_argument("-f", "--orientation", help="Please enter the direction you are facing (orientation)")
     return p.parse_args()
 
-def write_data_to_csv():
-    args = parse_args()
+def write_data_to_csv(location, orientation, output_file = DEFAULT_CSV):
 
-    location = args.location
     if not location:
-        try:
-            location = input("Enter your current location: ").strip()
-        except EOFError:
-            location = ""
-    if not location:
-        print("Location is required.", file=sys.stderr)
-        return 3
-    
-    orientation = args.orientation
-    if not orientation:
-        try:
-            orientation = input("Enter your orientation: ").strip()
-        except EOFError:
-            orientation = ""
-    if not orientation:
-        print("Orientation is required.", file=sys.stderr)
-        return 4
-    
-    output_file = args.out
-    if not output_file:
-        try:
-            output_file = input("Enter output CSV file path: ").strip()
-        except EOFError:
-            output_file = "test.csv"
-    if not output_file:
-        print("Output file path is required.", file=sys.stderr)
-        return 5
-    
-    try:
-        scan_data = scan_for_networks(location, orientation)
-    except RuntimeError as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print("[FATAL] Unexpected error occurred", file=sys.stderr)
-        print(f"        {e}", file=sys.stderr)
-        sys.exit(2)
+        raise ValueError("Location is required")
 
-    file_exists = os.path.exists(output_file)
-       
+    if not orientation:
+        raise ValueError("Orientation is required")
+
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    scan_data = scan_for_networks(location, orientation)
+
+    file_exists = output_file.exists()
+
     with open(output_file, 'a', newline='') as csvfile:
-        fieldnames = ['scan_id', 'ssid', 'bssid', 'rssi', 'noise', 'channel', 'timestamp', 'location', 'latitude', 'longitude', 'orientation']
+        fieldnames = [
+            'scan_id','ssid','bssid','rssi',
+            'noise','channel','timestamp',
+            'location','latitude','longitude','orientation'
+        ]
+
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
         if not file_exists:
             writer.writeheader()
+
         writer.writerows(scan_data)
 
-def write_data_to_db():
-    args = parse_args()
 
-    location = args.location
-    if not location:
-        try:
-            location = input("Enter your current location: ").strip()
-        except EOFError:
-            location = ""
-    if not location:
-        print("Location is required.", file=sys.stderr)
-        return 3
-    
-    orientation = args.orientation
-    if not orientation:
-        try:
-            orientation = input("Enter your orientation: ").strip()
-        except EOFError:
-            orientation = ""
-    if not orientation:
-        print("Orientation is required.", file=sys.stderr)
-        return 4
+def write_data_to_db(location, orientation):
 
-    
-    try:
-        scan_data = scan_for_networks(location, orientation)
-    except RuntimeError as e:
-        print(f"[ERROR] {e}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print("[FATAL] Unexpected error occurred", file=sys.stderr)
-        print(f"        {e}", file=sys.stderr)
-        sys.exit(2)
+    if not location:
+        raise ValueError("Location is required")
+
+    if not orientation:
+        raise ValueError("Orientation is required")
+
+    scan_data = scan_for_networks(location, orientation)
 
     conn = init_db()
     store_raw_scan(conn, scan_data)
     conn.close()
-       
     
 
-if __name__ == "__main__":
-    write_data_to_db()
+def main():
+    args = parse_args()
+    
+    location = args.location or input("Enter your current location: ").strip()
+    orientation = args.orientation or input("Enter your orientation: ").strip()
 
+    try:
+        write_data_to_db(location, orientation)
+    except ValueError as e:
+        print(f"[INPUT ERROR] {e}", file=sys.stderr)
+        sys.exit(2)
+
+    except RuntimeError as e:
+        print(f"[SCAN ERROR] {e}", file=sys.stderr)
+        sys.exit(3)
+
+
+if __name__ == "__main__":
+    main()
 

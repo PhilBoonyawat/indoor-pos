@@ -1,5 +1,9 @@
 import time
 import subprocess
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SCANNER_PATH = PROJECT_ROOT / "data_collection" / "data_collector_service.py"
 
 LOCATION = "(S)7.03"
 ORIENTATION = "162 S"
@@ -11,7 +15,7 @@ while i < 10:
     subprocess.run(
         [
             "python3",
-            "data_collector_service.py",
+            str(SCANNER_PATH),
             "-l", LOCATION,
             "-f", ORIENTATION
         ],
