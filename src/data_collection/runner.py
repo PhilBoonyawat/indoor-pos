@@ -3,27 +3,23 @@ import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCANNER_PATH = PROJECT_ROOT / "data_collection" / "data_collector_service.py"
 
-LOCATION = "(S)7.03"
-ORIENTATION = "162 S"
+LOCATION = "(S)7.06"
+ORIENTATION = "269 W"
 
-i = 0
-while i < 10:
-    print("Running Wi-Fi scan...")
-    print(i)
+for i in range(10):
+    print(f"Running Wi-Fi scan...\n{i}")
     subprocess.run(
         [
-            "python3",
-            str(SCANNER_PATH),
+            "python3", "-m", "data_collection.data_collector_service",
             "-l", LOCATION,
             "-f", ORIENTATION
         ],
-        check=False
+        check=False,
+        cwd=str(PROJECT_ROOT / "src")
     )
-    i += 1
     print("done")
-
     print("Sleeping for 3 seconds...\n")
     time.sleep(3)
+
 print("YAYYYYYYY")

@@ -1,10 +1,10 @@
 from CoreWLAN import CWWiFiClient
 from datetime import datetime
-from datacollection.location_service import retrieve_current_location
+from data_collection.location_service import retrieve_current_location
 import sys
 import csv
 import argparse
-from datacollection.db_service import init_db, store_raw_scan
+from data_collection.db_service import init_db, store_raw_scan
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

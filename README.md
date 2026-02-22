@@ -10,7 +10,7 @@ pip install -r requirements.txt
 ### To Scan Wi-Fi: adjust parameters in run.py accordingly and toggle Python Location Services access ON
 ```bash
 source venv/bin/activate
-python3 run.py 
+python3 -m src.data_collection.runner
 ```
 
 Rooms scanned
