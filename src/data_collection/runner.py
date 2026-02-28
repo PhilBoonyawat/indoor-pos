@@ -4,8 +4,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-LOCATION = "(S)7.06"
-ORIENTATION = "269 W"
+LOCATION = "(S)7.01"
+ORIENTATION = "231 SW"
 
 for i in range(10):
     print(f"Running Wi-Fi scan...\n{i}")
