@@ -1,0 +1,25 @@
+#map{
+  height:700px;
+  width:100%;
+  border-radius:10px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.2);
+  margin-top: 20vh;
+}
+
+.room-label{
+  font-weight:bold;
+  font-size:14px;
+  color:#111;
+  text-shadow:0 0 5px white;
+}
+
+#panel{
+  position:absolute;
+  top:20px;
+  right:20px;
+  background:white;
+  padding:15px;
+  border-radius:8px;
+  box-shadow:0 5px 20px rgba(0,0,0,0.2);
+  width:180px;
+}

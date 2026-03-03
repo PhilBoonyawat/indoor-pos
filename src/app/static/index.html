@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Indoor Room Detection Demo</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<h2>WiFi Indoor Room Detection Demo</h2>
+<p>Current predicted room: <b id="roomDisplay">None</b></p>
+
+<div id="panel">
+  <h3>Indoor Positioning</h3>
+  <p>Room: <span id="roomDisplay">--</span></p>
+  <p>Confidence: <span id="confidence">--</span>%</p>
+  <p>Access Points: <span id="apCount">--</span></p>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>

@@ -4,10 +4,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-LOCATION = "(S)7.01"
-ORIENTATION = "231 SW"
+LOCATION = "(S)7.04"
+ORIENTATION = "164 S"
 
-for i in range(10):
+for i in range(50):
     print(f"Running Wi-Fi scan...\n{i}")
     subprocess.run(
         [
