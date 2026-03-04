@@ -14,7 +14,7 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <body>
 
 <h2>WiFi Indoor Room Detection Demo</h2>
-<p>Current predicted room: <b id="roomDisplay">None</b></p>
+<p>Current predicted room: <b id="roomTitle">None</b></p>
 
 <div id="panel">
   <h3>Indoor Positioning</h3>
@@ -22,6 +22,8 @@ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <p>Confidence: <span id="confidence">--</span>%</p>
   <p>Access Points: <span id="apCount">--</span></p>
 </div>
+
+<button id="toggleHeat">Toggle Signal Heatmap</button>
 
 <div id="map"></div>
 
