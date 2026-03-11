@@ -1,211 +1,286 @@
-// ---------------- MAP SETUP ----------------
+// ============================================================
+// CONFIG — Update these to match your floor plan
+// ============================================================
+const CONFIG = {
+    center: [51.5131, -0.1170],
+    defaultZoom: 20,
 
-const map = L.map('map', {
-  crs: L.CRS.Simple,
-  minZoom: -2
-})
+    // Enable the floor plan overlay
+    floorPlanUrl: "/static/floorplan.png",   // ← change from null
 
-const width = 2000
-const height = 1400
+    // These need to match the real lat/lng corners of your building
+    // You'll need to fine-tune these by checking Google Maps
+    floorPlanBounds: [
+        [51.51265041169237, -0.11728181865167508],  // Southwest corner
+        [51.512482671238374, -0.11679127299528806]   // Northeast corner
+    ],
 
-const bounds = [[0,0],[height,width]]
-
-L.imageOverlay("floorplan.png", bounds).addTo(map)
-
-map.fitBounds(bounds)
-
-
-// ---------------- ROOM STORAGE ----------------
-
-const rooms = {}
-
-function createRoom(name, coords){
-
-  const room = L.polygon(coords,{
-    color:"#444",
-    weight:2,
-    fillColor:"#888",
-    fillOpacity:0.2
-  }).addTo(map)
-
-  room.bindTooltip(name,{
-    permanent:true,
-    direction:"center",
-    className:"room-label"
-  })
-
-  rooms[name] = room
-}
-
-
-// ---------------- ROOM POLYGONS ----------------
-
-createRoom("7.01",[
-[608,1436],
-[618,1722],
-[404,1740],
-[397,1421]
-])
-
-createRoom("7.02",[
-[856,1368],
-[858,1694],
-[628,1718],
-[622,1428]
-])
-
-createRoom("7.03",[
-[874,1690],
-[1230,1676],
-[1232,1286],
-[882,1296]
-])
-
-createRoom("7.04",[
-[876,850],
-[1212,844],
-[1220,1276],
-[862,1286]
-])
-
-createRoom("7.05",[
-[872,340],
-[1228,320],
-[1240,808],
-[892,832]
-])
-
-createRoom("7.06",[
-[764,328],
-[396,300],
-[392,856],
-[496,872],
-[492,1036],
-[736,1056],
-[768,368]
-])
-
-
-// ---------------- USER LOCATION DOT ----------------
-
-const userMarker = L.circleMarker([800,900],{
-  radius:10,
-  color:"#0066ff",
-  fillColor:"#0099ff",
-  fillOpacity:1
-}).addTo(map)
-
-
-// ---------------- HEATMAP LAYER ----------------
-
-const heat = L.heatLayer([], {
-
-  radius:70,
-  blur:50,
-
-  gradient:{
-    0.1:"blue",
-    0.3:"cyan",
-    0.5:"lime",
-    0.7:"yellow",
-    1.0:"red"
+    // Match your actual floor plan image dimensions
+    floorPlanWidth: 858,   // ← update to your image's pixel width
+    floorPlanHeight: 782,   // ← update to your image's pixel height
   }
 
-}).addTo(map)
+// ============================================================
+// MAP SETUP
+// ============================================================
+const map = L.map("map", {
+    center: CONFIG.center,
+    zoom: CONFIG.defaultZoom,
+    zoomControl: true,
+});
 
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 22,
+    attribution: "&copy; OpenStreetMap contributors",
+}).addTo(map);
 
-// ---------------- RSSI NORMALIZATION ----------------
-
-function normalizeRSSI(rssi){
-
-  return Math.max(0, Math.min(1, (100 + rssi) / 70))
-
+// Floor plan overlay
+let floorPlanLayer = null;
+if (CONFIG.floorPlanUrl) {
+    floorPlanLayer = L.imageOverlay(
+        CONFIG.floorPlanUrl,
+        CONFIG.floorPlanBounds,
+        { opacity: 0.75, interactive: false }
+    ).addTo(map);
 }
 
 
-// ---------------- ADD HEAT INSIDE ROOM ----------------
+// ============================================================
+// POSITION MARKER
+// ============================================================
+const positionIcon = L.divIcon({
+    className: "position-marker",
+    html: `<div class="marker-pulse" style="
+        width: 20px; height: 20px;
+        background: #3b82f6;
+        border: 3px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+});
 
-function addSignalHeat(roomName, rssi){
+const positionMarker = L.marker(CONFIG.center, { icon: positionIcon }).addTo(map);
+positionMarker.bindPopup("Waiting for position...");
 
-  const room = rooms[roomName]
 
-  if(!room) return
+// ============================================================
+// ROOM POSITIONS — Maps room names to lat/lng on the floor plan
+// ============================================================
+let roomPositions = {};
 
-  const center = room.getBounds().getCenter()
+// Convert pixel position on floor plan to lat/lng
+function pixelToLatLng(x, y) {
+    const sw = CONFIG.floorPlanBounds[0];
+    const ne = CONFIG.floorPlanBounds[1];
+    const lat = sw[0] + (1 - y / CONFIG.floorPlanHeight) * (ne[0] - sw[0]);
+    const lng = sw[1] + (x / CONFIG.floorPlanWidth) * (ne[1] - sw[1]);
+    return [lat, lng];
+}
 
-  const intensity = normalizeRSSI(rssi)
+// Load room positions from backend
+async function loadRoomPositions() {
+    try {
+        const res = await fetch("/api/room-positions");
+        roomPositions = await res.json();
+        console.log("Room positions loaded:", roomPositions);
+    } catch (e) {
+        console.log("No room positions available — using default center");
+    }
+}
 
-  const points = []
+function getRoomLatLng(room, posX, posY) {
+    // If we have pixel positions from the labeller tool, convert them
+    if (posX > 0 || posY > 0) {
+        return pixelToLatLng(posX, posY);
+    }
 
-  // generate multiple points inside room
-  for(let i=0;i<12;i++){
+    // Fallback: spread rooms in a grid pattern around center
+    const roomOffsets = {
+        "(S)7.01": [-0.00015, -0.00030],
+        "(S)7.02": [-0.00015,  0.00000],
+        "(S)7.03": [-0.00015,  0.00030],
+        "(S)7.04": [ 0.00015, -0.00030],
+        "(S)7.05": [ 0.00015,  0.00000],
+        "(S)7.06": [ 0.00015,  0.00030],
+    };
 
-    const offsetY = (Math.random()-0.5)*120
-    const offsetX = (Math.random()-0.5)*120
-
-    points.push([
-      center.lat + offsetY,
-      center.lng + offsetX,
-      intensity
-    ])
-
-  }
-
-  heat.addLatLng(points)
-
+    const offset = roomOffsets[room] || [0, 0];
+    return [CONFIG.center[0] + offset[0], CONFIG.center[1] + offset[1]];
 }
 
 
-// ---------------- ROOM HIGHLIGHT ----------------
+// ============================================================
+// TRAIL
+// ============================================================
+let showTrail = true;
+let trailPoints = [];
+const trailLine = L.polyline([], {
+    color: "#3b82f6",
+    weight: 2,
+    opacity: 0.5,
+    dashArray: "5, 8",
+}).addTo(map);
 
-function highlightRoom(roomName){
+const trailDots = L.layerGroup().addTo(map);
 
-  for(let r in rooms){
+function addTrailPoint(lat, lng) {
+    if (!showTrail) return;
+    trailPoints.push([lat, lng]);
+    if (trailPoints.length > 50) trailPoints.shift();
+    trailLine.setLatLngs(trailPoints);
 
-    rooms[r].setStyle({
-      fillColor:"#888",
-      fillOpacity:0.2
-    })
-
-  }
-
-  if(rooms[roomName]){
-
-    rooms[roomName].setStyle({
-      fillColor:"#00ff88",
-      fillOpacity:0.5,
-      color:"#00cc66",
-      weight:3
-    })
-
-    document.getElementById("roomDisplay").innerText = roomName
-
-    const center = rooms[roomName].getBounds().getCenter()
-
-    userMarker.setLatLng(center)
-
-  }
-
+    const dot = L.circleMarker([lat, lng], {
+        radius: 3, fillColor: "#3b82f6", fillOpacity: 0.3, stroke: false,
+    });
+    trailDots.addLayer(dot);
+    if (trailDots.getLayers().length > 50) {
+        trailDots.removeLayer(trailDots.getLayers()[0]);
+    }
 }
 
 
-// ---------------- RANDOM DEMO PREDICTION ----------------
+// ============================================================
+// MODEL SELECTION
+// ============================================================
+const modelSelect = document.getElementById("model-select");
 
-const roomList = ["7.01","7.02","7.03","7.04","7.05","7.06"]
+async function loadModels() {
+    try {
+        const res = await fetch("/api/models");
+        const data = await res.json();
 
-function randomPrediction(){
+        modelSelect.innerHTML = "";
+        data.available.forEach(name => {
+            const opt = document.createElement("option");
+            opt.value = name;
+            opt.textContent = name;
+            if (name === data.active) opt.selected = true;
+            modelSelect.appendChild(opt);
+        });
 
-  const room = roomList[Math.floor(Math.random()*roomList.length)]
+        if (data.available.length === 0) {
+            modelSelect.innerHTML = '<option value="">Demo Mode</option>';
+        }
+    } catch (e) {
+        modelSelect.innerHTML = '<option value="">Offline</option>';
+    }
+}
 
-  highlightRoom(room)
+modelSelect.addEventListener("change", async () => {
+    const name = modelSelect.value;
+    if (!name) return;
 
-  // simulate RSSI measurement
-  const rssi = -40 - Math.random()*40
+    try {
+        await fetch("/api/model", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model_name: name }),
+        });
+        console.log("Switched to:", name);
+    } catch (e) {
+        console.error("Failed to switch model:", e);
+    }
+});
 
-  addSignalHeat(room, rssi)
 
+// ============================================================
+// POLLING
+// ============================================================
+const modeBadge = document.getElementById("mode-badge");
+const roomLabel = document.getElementById("room-label");
+const confidenceLabel = document.getElementById("confidence-label");
+const apsCount = document.getElementById("aps-count");
+const modelName = document.getElementById("model-name");
+const lastUpdate = document.getElementById("last-update");
+
+async function fetchPosition() {
+    try {
+        const res = await fetch("/api/position");
+        if (!res.ok) throw new Error("API error");
+        const pos = await res.json();
+
+        // Update marker position
+        const latlng = getRoomLatLng(pos.room, pos.position_x, pos.position_y);
+        positionMarker.setLatLng(latlng);
+
+        // Update popup
+        positionMarker.setPopupContent(`
+            <div class="position-popup">
+                <strong>Room:</strong> ${pos.room}<br>
+                <strong>Confidence:</strong> ${(pos.confidence * 100).toFixed(1)}%<br>
+                <strong>Model:</strong> ${pos.model_used}<br>
+                <strong>APs:</strong> ${pos.aps_detected}<br>
+                <strong>Mode:</strong> ${pos.mode}
+            </div>
+        `);
+
+        // Trail
+        addTrailPoint(latlng[0], latlng[1]);
+
+        // Update header
+        roomLabel.textContent = `Room: ${pos.room}`;
+        confidenceLabel.textContent = `${(pos.confidence * 100).toFixed(1)}%`;
+
+        // Mode badge
+        if (pos.mode === "live") {
+            modeBadge.textContent = "LIVE";
+            modeBadge.className = "mode-badge live";
+        } else {
+            modeBadge.textContent = "DEMO";
+            modeBadge.className = "mode-badge demo";
+        }
+
+        // Info panel
+        apsCount.textContent = pos.aps_detected;
+        modelName.textContent = pos.model_used;
+        lastUpdate.textContent = pos.timestamp
+            ? new Date(pos.timestamp).toLocaleTimeString()
+            : "—";
+
+    } catch (e) {
+        console.error("Fetch error:", e);
+        modeBadge.textContent = "OFFLINE";
+        modeBadge.className = "mode-badge demo";
+    }
 }
 
 
-// update every 3 seconds
-setInterval(randomPrediction,3000)
+// ============================================================
+// CONTROLS
+// ============================================================
+document.getElementById("btn-center").addEventListener("click", () => {
+    map.setView(positionMarker.getLatLng(), CONFIG.defaultZoom);
+});
+
+document.getElementById("btn-trail").addEventListener("click", (e) => {
+    showTrail = !showTrail;
+    e.target.textContent = showTrail ? "🔵" : "⚪";
+    if (showTrail) {
+        trailLine.addTo(map);
+        trailDots.addTo(map);
+    } else {
+        map.removeLayer(trailLine);
+        map.removeLayer(trailDots);
+    }
+});
+
+document.getElementById("btn-clear").addEventListener("click", () => {
+    trailPoints = [];
+    trailLine.setLatLngs([]);
+    trailDots.clearLayers();
+});
+
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+    await loadModels();
+    await loadRoomPositions();
+    fetchPosition();
+    setInterval(fetchPosition, CONFIG.pollInterval);
+}
+
+init();

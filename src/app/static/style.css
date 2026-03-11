@@ -1,25 +1,233 @@
-#map{
-  height:700px;
-  width:100%;
-  border-radius:10px;
-  box-shadow:0 10px 25px rgba(0,0,0,0.2);
-  margin-top: 20vh;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
-.room-label{
-  font-weight:bold;
-  font-size:14px;
-  color:#111;
-  text-shadow:0 0 5px white;
+body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0e1a;
+    color: #e8ecf4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
-#panel{
-  position:absolute;
-  top:20px;
-  right:20px;
-  background:white;
-  padding:15px;
-  border-radius:8px;
-  box-shadow:0 5px 20px rgba(0,0,0,0.2);
-  width:180px;
+/* ── Header ──────────────────────────────────── */
+header {
+    background: #111827;
+    border-bottom: 1px solid #1e293b;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 1000;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo {
+    width: 30px;
+    height: 30px;
+    background: #3b82f6;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+h1 span {
+    color: #64748b;
+    font-weight: 400;
+}
+
+.header-center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.mode-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.mode-badge.live {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.mode-badge.demo {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
+}
+
+.room-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: #1e293b;
+    padding: 5px 12px;
+    border-radius: 5px;
+}
+
+.confidence-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: #10b981;
+    font-weight: 600;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-selector-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.model-select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    background: #1e293b;
+    color: #e8ecf4;
+    border: 1px solid #334155;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    outline: none;
+}
+
+.model-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* ── Map ─────────────────────────────────────── */
+#map {
+    flex: 1;
+    z-index: 1;
+}
+
+/* ── Info Panel ──────────────────────────────── */
+#info-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(17, 24, 39, 0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    padding: 12px 16px;
+    z-index: 1000;
+    min-width: 180px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    gap: 16px;
+}
+
+.info-key {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.info-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #e8ecf4;
+}
+
+/* ── Controls ────────────────────────────────── */
+#controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 6px;
+    z-index: 1000;
+}
+
+#controls button {
+    width: 38px;
+    height: 38px;
+    background: rgba(17, 24, 39, 0.92);
+    backdrop-filter: blur(8px);
+    color: #e8ecf4;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+#controls button:hover {
+    background: #1e293b;
+    border-color: #3b82f6;
+}
+
+/* ── Leaflet Overrides ───────────────────────── */
+.leaflet-popup-content-wrapper {
+    background: #111827;
+    color: #e8ecf4;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+}
+
+.leaflet-popup-tip {
+    background: #111827;
+}
+
+.position-popup {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    line-height: 1.7;
+}
+
+.position-popup strong {
+    color: #3b82f6;
+}
+
+/* Pulse animation for marker */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+    70% { box-shadow: 0 0 0 18px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.marker-pulse {
+    animation: pulse 2s infinite;
 }

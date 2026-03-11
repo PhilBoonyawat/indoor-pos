@@ -1,35 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Indoor Room Detection Demo</title>
-
-<link rel="stylesheet"
-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-<link rel="stylesheet" href="style.css">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indoor Position Tracker — Bush House</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css" />
 </head>
-
 <body>
 
-<h2>WiFi Indoor Room Detection Demo</h2>
-<p>Current predicted room: <b id="roomTitle">None</b></p>
+    <header>
+        <div class="header-left">
+            <div class="logo">📍</div>
+            <h1>Indoor Tracker <span>/ Bush House L7</span></h1>
+        </div>
+        <div class="header-center">
+            <span id="mode-badge" class="mode-badge demo">DEMO</span>
+            <span id="room-label" class="room-label">Room: —</span>
+            <span id="confidence-label" class="confidence-label">—</span>
+        </div>
+        <div class="header-right">
+            <label class="model-selector-label" for="model-select">Model:</label>
+            <select id="model-select" class="model-select">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+    </header>
 
-<div id="panel">
-  <h3>Indoor Positioning</h3>
-  <p>Room: <span id="roomDisplay">--</span></p>
-  <p>Confidence: <span id="confidence">--</span>%</p>
-  <p>Access Points: <span id="apCount">--</span></p>
-</div>
+    <div id="map"></div>
 
-<button id="toggleHeat">Toggle Signal Heatmap</button>
+    <div id="info-panel">
+        <div class="info-row">
+            <span class="info-key">APs Detected</span>
+            <span id="aps-count" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-key">Model</span>
+            <span id="model-name" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-key">Last Update</span>
+            <span id="last-update" class="info-value">—</span>
+        </div>
+    </div>
 
-<div id="map"></div>
+    <div id="controls">
+        <button id="btn-center" title="Center on position">🎯</button>
+        <button id="btn-trail" title="Toggle trail">🔵</button>
+        <button id="btn-clear" title="Clear trail">🗑️</button>
+    </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-<script src="app.js"></script>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/app.js"></script>
 </body>
 </html>
