@@ -2,47 +2,39 @@
 // CONFIG — Update these to match your floor plan
 // ============================================================
 const CONFIG = {
-    center: [51.5131, -0.1170],
-    defaultZoom: 20,
+    // Floor plan image
+    floorPlanUrl: "/static/floorplan.png",
+    floorPlanWidth: 858,
+    floorPlanHeight: 782,
 
-    // Enable the floor plan overlay
-    floorPlanUrl: "/static/floorplan.png",   // ← change from null
+    pollInterval: 3000,
+};
 
-    // These need to match the real lat/lng corners of your building
-    // You'll need to fine-tune these by checking Google Maps
-    floorPlanBounds: [
-        [51.51265041169237, -0.11728181865167508],  // Southwest corner
-        [51.512482671238374, -0.11679127299528806]   // Northeast corner
-    ],
-
-    // Match your actual floor plan image dimensions
-    floorPlanWidth: 858,   // ← update to your image's pixel width
-    floorPlanHeight: 782,   // ← update to your image's pixel height
-  }
 
 // ============================================================
-// MAP SETUP
+// MAP SETUP — Floor plan as the entire map (no base tiles)
 // ============================================================
+
+// Use simple CRS so pixel coordinates map directly
+const bounds = [[0, 0], [CONFIG.floorPlanHeight, CONFIG.floorPlanWidth]];
+
 const map = L.map("map", {
-    center: CONFIG.center,
-    zoom: CONFIG.defaultZoom,
+    crs: L.CRS.Simple,        // pixel-based coordinates, no lat/lng
+    minZoom: -2,
+    maxZoom: 3,
     zoomControl: true,
+    attributionControl: false,
 });
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 22,
-    attribution: "&copy; OpenStreetMap contributors",
-}).addTo(map);
+// Add floor plan as the map itself
+const floorPlanLayer = L.imageOverlay(
+    CONFIG.floorPlanUrl,
+    bounds
+).addTo(map);
 
-// Floor plan overlay
-let floorPlanLayer = null;
-if (CONFIG.floorPlanUrl) {
-    floorPlanLayer = L.imageOverlay(
-        CONFIG.floorPlanUrl,
-        CONFIG.floorPlanBounds,
-        { opacity: 0.75, interactive: false }
-    ).addTo(map);
-}
+// Fit the view to the floor plan
+map.fitBounds(bounds);
+map.setMaxBounds(bounds.map(b => [b[0] - 100, b[1] - 100]));  // slight padding
 
 
 // ============================================================
@@ -61,53 +53,63 @@ const positionIcon = L.divIcon({
     iconAnchor: [10, 10],
 });
 
-const positionMarker = L.marker(CONFIG.center, { icon: positionIcon }).addTo(map);
+// Start marker at center of floor plan
+const startPos = [CONFIG.floorPlanHeight / 2, CONFIG.floorPlanWidth / 2];
+const positionMarker = L.marker(startPos, { icon: positionIcon }).addTo(map);
 positionMarker.bindPopup("Waiting for position...");
 
 
 // ============================================================
-// ROOM POSITIONS — Maps room names to lat/lng on the floor plan
+// ROOM POSITIONS — Maps room names to pixel coords on floor plan
 // ============================================================
 let roomPositions = {};
 
-// Convert pixel position on floor plan to lat/lng
-function pixelToLatLng(x, y) {
-    const sw = CONFIG.floorPlanBounds[0];
-    const ne = CONFIG.floorPlanBounds[1];
-    const lat = sw[0] + (1 - y / CONFIG.floorPlanHeight) * (ne[0] - sw[0]);
-    const lng = sw[1] + (x / CONFIG.floorPlanWidth) * (ne[1] - sw[1]);
-    return [lat, lng];
-}
-
-// Load room positions from backend
 async function loadRoomPositions() {
     try {
         const res = await fetch("/api/room-positions");
         roomPositions = await res.json();
         console.log("Room positions loaded:", roomPositions);
+
+        // Add room labels to the map
+        for (const [room, pos] of Object.entries(roomPositions)) {
+            // Leaflet Simple CRS uses [y, x] but y is inverted (0 = top)
+            const latlng = [CONFIG.floorPlanHeight - pos.y, pos.x];
+
+            L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: '#4ecca3',
+                fillOpacity: 0.3,
+                color: '#4ecca3',
+                weight: 1,
+            }).addTo(map);
+
+            L.tooltip({ permanent: true, direction: 'top', className: 'room-tooltip' })
+                .setLatLng(latlng)
+                .setContent(room)
+                .addTo(map);
+        }
     } catch (e) {
-        console.log("No room positions available — using default center");
+        console.log("No room positions available");
     }
 }
 
-function getRoomLatLng(room, posX, posY) {
-    // If we have pixel positions from the labeller tool, convert them
+function getRoomCoords(room, posX, posY) {
+    // Convert pixel position to Leaflet Simple CRS coordinates
+    // In Simple CRS: [y, x] where y=0 is bottom, but our pixels y=0 is top
+    // So we invert: leaflet_y = imageHeight - pixel_y
+
     if (posX > 0 || posY > 0) {
-        return pixelToLatLng(posX, posY);
+        return [CONFIG.floorPlanHeight - posY, posX];
     }
 
-    // Fallback: spread rooms in a grid pattern around center
-    const roomOffsets = {
-        "(S)7.01": [-0.00015, -0.00030],
-        "(S)7.02": [-0.00015,  0.00000],
-        "(S)7.03": [-0.00015,  0.00030],
-        "(S)7.04": [ 0.00015, -0.00030],
-        "(S)7.05": [ 0.00015,  0.00000],
-        "(S)7.06": [ 0.00015,  0.00030],
-    };
+    // Fallback: check room_positions loaded from API
+    const pos = roomPositions[room];
+    if (pos) {
+        return [CONFIG.floorPlanHeight - pos.y, pos.x];
+    }
 
-    const offset = roomOffsets[room] || [0, 0];
-    return [CONFIG.center[0] + offset[0], CONFIG.center[1] + offset[1]];
+    // Last resort: center of floor plan
+    return [CONFIG.floorPlanHeight / 2, CONFIG.floorPlanWidth / 2];
 }
 
 
@@ -202,8 +204,8 @@ async function fetchPosition() {
         const pos = await res.json();
 
         // Update marker position
-        const latlng = getRoomLatLng(pos.room, pos.position_x, pos.position_y);
-        positionMarker.setLatLng(latlng);
+        const coords = getRoomCoords(pos.room, pos.position_x, pos.position_y);
+        positionMarker.setLatLng(coords);
 
         // Update popup
         positionMarker.setPopupContent(`
@@ -217,7 +219,7 @@ async function fetchPosition() {
         `);
 
         // Trail
-        addTrailPoint(latlng[0], latlng[1]);
+        addTrailPoint(coords[0], coords[1]);
 
         // Update header
         roomLabel.textContent = `Room: ${pos.room}`;
@@ -251,7 +253,7 @@ async function fetchPosition() {
 // CONTROLS
 // ============================================================
 document.getElementById("btn-center").addEventListener("click", () => {
-    map.setView(positionMarker.getLatLng(), CONFIG.defaultZoom);
+    map.fitBounds(bounds);
 });
 
 document.getElementById("btn-trail").addEventListener("click", (e) => {

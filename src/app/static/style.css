@@ -231,3 +231,25 @@ h1 span {
 .marker-pulse {
     animation: pulse 2s infinite;
 }
+
+/* Room labels on floor plan */
+.room-tooltip {
+    background: rgba(17, 24, 39, 0.85);
+    color: #4ecca3;
+    border: 1px solid #4ecca3;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    box-shadow: none;
+}
+
+.room-tooltip::before {
+    border-top-color: #4ecca3;
+}
+
+/* Dark background behind floor plan */
+.leaflet-container {
+    background: #0a0e1a;
+}
