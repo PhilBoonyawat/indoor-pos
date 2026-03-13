@@ -1,7 +1,7 @@
 """
 train.py — Train and compare 5 classification models for WiFi fingerprint room prediction.
 
-Models: Weighted KNN, Random Forest, XGBoost, MLP, SVM
+Models: Weighted KNN, Random Forest, MLP, SVM
 
 Usage:
     python train.py                              # Uses default DB path
@@ -34,14 +34,6 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score
 )
-
-# XGBoost
-try:
-    from xgboost import XGBClassifier
-    HAS_XGBOOST = True
-except ImportError:
-    HAS_XGBOOST = False
-    print("[Warning] XGBoost not installed. Run: pip install xgboost")
 
 # Plotting
 try:
@@ -111,22 +103,6 @@ def get_models():
             "3 layers (256→128→64), ReLU, Adam, early stopping"
         ),
     }
-
-    if HAS_XGBOOST:
-        models["XGBoost"] = (
-            XGBClassifier(
-                n_estimators=200,
-                max_depth=6,
-                learning_rate=0.1,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                random_state=42,
-                use_label_encoder=False,
-                eval_metric='mlogloss',
-                n_jobs=-1
-            ),
-            "200 trees, depth=6, lr=0.1, subsample=0.8"
-        )
 
     return models
 

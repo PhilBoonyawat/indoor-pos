@@ -53,7 +53,7 @@ def format_ap_label(bssid, bssid_to_ssid):
 
 def feature_importance_analysis(models_dir, feature_names, output_dir, db_path=None, top_n=20):
     """
-    Extract and plot feature importance from Random Forest and XGBoost.
+    Extract and plot feature importance from Random Forest.
     Shows which access points are most useful for room discrimination.
     Maps BSSIDs back to SSIDs for readable labels.
     """
@@ -68,7 +68,7 @@ def feature_importance_analysis(models_dir, feature_names, output_dir, db_path=N
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 8))
 
-    for ax, model_name in zip(axes, ['random_forest', 'xgboost']):
+    for ax, model_name in zip(axes, ['random_forest']):
         model_path = os.path.join(models_dir, f'{model_name}.pkl')
         if not os.path.exists(model_path):
             ax.set_title(f'{model_name} — not found')

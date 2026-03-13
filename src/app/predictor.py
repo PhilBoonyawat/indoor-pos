@@ -57,7 +57,6 @@ class Predictor:
             'random_forest': 'Random Forest',
             'svm': 'SVM',
             'mlp': 'MLP',
-            'xgboost': 'XGBoost',
         }
 
         for filename, display_name in model_files.items():
