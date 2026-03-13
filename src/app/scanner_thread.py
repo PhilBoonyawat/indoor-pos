@@ -37,6 +37,8 @@ class ScannerThread:
         self._demo_scans = []
         self._demo_index = 0
         self._demo_loaded = False
+        self._last_mode = "demo"
+        self._last_fingerprint = None
 
     def start(self):
         """Start the background scanning thread."""
@@ -56,7 +58,7 @@ class ScannerThread:
 
     def get_scan_mode(self):
         """Returns current scan mode."""
-        return self._current_position.get("mode", "demo")
+        return self._last_mode
 
     def get_current_position(self):
         with self._lock:
@@ -71,7 +73,7 @@ class ScannerThread:
         while self._running:
             try:
                 fingerprint = None
-                mode = "demo"
+                mode = self._last_mode  # persist mode from last successful scan
 
                 # 1. Try live WiFi scan
                 live_scan = self._try_live_scan()
@@ -84,18 +86,25 @@ class ScannerThread:
                         # We're in the building — use live scan
                         fingerprint = live_scan
                         mode = "live"
+                        self._last_mode = "live"
+                        self._last_fingerprint = live_scan
                         print(f"[Scanner] Live scan — {len(live_scan)} APs total, {known_aps} known")
                     else:
-                        # WiFi works but we're not in the building
-                        print(f"[Scanner] Outside building — {len(live_scan)} APs found, only {known_aps} known. Using demo mode.")
+                        print(f"[Scanner] Outside building — {len(live_scan)} APs found, only {known_aps} known.")
+                else:
+                    # Scan failed (busy/permissions) — reuse last live scan if available
+                    if self._last_fingerprint is not None and self._last_mode == "live":
+                        fingerprint = self._last_fingerprint
+                        mode = "live"
 
-                # 3. Fall back to demo if no usable live scan
+                # 3. Fall back to demo only if we have no usable scan at all
                 if fingerprint is None:
                     if not self._demo_loaded:
                         self._load_demo_scans()
                         self._demo_loaded = True
                     fingerprint = self._get_demo_fingerprint()
                     mode = "demo"
+                    self._last_mode = "demo"
 
                 # 4. Run prediction
                 if fingerprint is not None:
@@ -130,31 +139,35 @@ class ScannerThread:
             return None
 
     def _scan_macos(self):
-        """Scan WiFi on macOS using airport utility."""
-        airport_path = "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport"
-        result = subprocess.run(
-            [airport_path, "-s"],
-            capture_output=True, text=True, timeout=10
-        )
+        """Scan WiFi on macOS using CoreWLAN framework (same as data collection)."""
+        try:
+            from CoreWLAN import CWWiFiClient
 
-        if not result.stdout.strip() or "WARNING" in result.stderr:
+            client = CWWiFiClient.sharedWiFiClient()
+            wifi_iface = client.interface()
+            scans, scan_err = wifi_iface.scanForNetworksWithName_error_(None, None)
+
+            if scan_err:
+                # "Resource busy" is common when scanning too fast
+                # Use the last successful scan instead of failing
+                if "Resource busy" in str(scan_err) and hasattr(self, '_last_live_scan'):
+                    return self._last_live_scan
+                return None
+
+            fingerprint = {}
+            for scan in scans:
+                bssid = scan.bssid()
+                if bssid and bssid not in fingerprint:
+                    fingerprint[bssid.lower()] = scan.rssiValue()
+
+            if fingerprint:
+                self._last_live_scan = fingerprint  # cache for busy errors
+
+            return fingerprint if fingerprint else None
+
+        except ImportError:
+            print("[Scanner] CoreWLAN not available — install pyobjc-framework-CoreWLAN")
             return None
-
-        fingerprint = {}
-        for line in result.stdout.strip().split("\n")[1:]:
-            parts = line.split()
-            if len(parts) >= 3:
-                for i, part in enumerate(parts):
-                    if re.match(r'^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$', part):
-                        bssid = part.lower()
-                        try:
-                            rssi = int(parts[i + 1]) if i + 1 < len(parts) else -100
-                            fingerprint[bssid] = rssi
-                        except (ValueError, IndexError):
-                            pass
-                        break
-
-        return fingerprint if fingerprint else None
 
     def _scan_linux(self):
         """Scan WiFi on Linux using nmcli."""
