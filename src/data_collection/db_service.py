@@ -49,7 +49,7 @@ def store_raw_scan(conn, scan_data):
     scan_id = str(uuid.uuid4())
 
     if not scan_data:
-        raise ValueError("No scan data provided")
+        raise ValueError("No scan data provided.")
 
 
     # 1. Insert scan metadata (same for all rows in this scan)
