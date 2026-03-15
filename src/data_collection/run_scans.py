@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def parse_args():
     parser = argparse.ArgumentParser(description="Run repeated Wi-Fi scans")
     parser.add_argument("-l", "--location", required=True, help="Room locatio in the building (EX: (S)7.05)")
-    parser.add_argument("-f", "--orientation", required=True, help="Orientation you are facing")
+    parser.add_argument("-f", "--orientation", required=True, help="Orientation you are facing (EX: 196 S or - if not recording)")
     parser.add_argument("-n", "--num-scans", type=int, default=20, help="Number of scans")
     parser.add_argument("-i", "--interval", type=int, default=3, help="Seconds between scans")
     return parser.parse_args()
