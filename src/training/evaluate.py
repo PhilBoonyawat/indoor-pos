@@ -23,9 +23,18 @@ from sklearn.metrics import accuracy_score
 
 try:
     import matplotlib
-    matplotlib.use('Agg')
+    matplotlib.use('pdf')  # non-interactive backend for file output
     import matplotlib.pyplot as plt
     import seaborn as sns
+
+    plt.style.use("seaborn-v0_8-paper")
+
+    matplotlib.rcParams.update({
+        "text.usetex": True,
+        "font.family": "serif",
+        "text.latex.preamble": r"\usepackage{amsmath}"
+    })
+
     HAS_PLOTTING = True
 except ImportError:
     HAS_PLOTTING = False
@@ -52,52 +61,48 @@ def format_ap_label(bssid, bssid_to_ssid):
 
 
 def feature_importance_analysis(models_dir, feature_names, output_dir, db_path=None, top_n=20):
-    """
-    Extract and plot feature importance from Random Forest.
-    Shows which access points are most useful for room discrimination.
-    Maps BSSIDs back to SSIDs for readable labels.
-    """
+
     if not HAS_PLOTTING:
         return
 
-    # Load BSSID → SSID mapping if database provided
     bssid_to_ssid = {}
     if db_path and os.path.exists(db_path):
         bssid_to_ssid = load_bssid_to_ssid_map(db_path)
         print(f"[Evaluate] Loaded {len(bssid_to_ssid)} BSSID→SSID mappings")
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
+    fig, ax = plt.subplots(figsize=(6,4))
 
-    for ax, model_name in zip(axes, ['random_forest']):
-        model_path = os.path.join(models_dir, f'{model_name}.pkl')
-        if not os.path.exists(model_path):
-            ax.set_title(f'{model_name} — not found')
-            continue
+    model_path = os.path.join(models_dir, 'random_forest.pkl')
+    if not os.path.exists(model_path):
+        print("[Evaluate] Random Forest model not found.")
+        return
 
-        model = joblib.load(model_path)
-        importances = model.feature_importances_
-        indices = np.argsort(importances)[-top_n:]
+    model = joblib.load(model_path)
+    importances = model.feature_importances_
 
-        # Map BSSIDs to readable labels
-        if bssid_to_ssid:
-            top_features = [format_ap_label(feature_names[i], bssid_to_ssid) for i in indices]
-        else:
-            top_features = [feature_names[i] for i in indices]
+    indices = np.argsort(importances)[-top_n:]
+    top_importances = importances[indices]
 
-        top_importances = importances[indices]
+    if bssid_to_ssid:
+        top_features = [format_ap_label(feature_names[i], bssid_to_ssid) for i in indices]
+    else:
+        top_features = [feature_names[i] for i in indices]
 
-        ax.barh(range(top_n), top_importances, color='#3b82f6', alpha=0.8)
-        ax.set_yticks(range(top_n))
-        ax.set_yticklabels(top_features, fontsize=7)
-        ax.set_xlabel('Importance')
-        ax.set_title(f'{model_name.replace("_", " ").title()} — Top {top_n} APs')
-        ax.grid(axis='x', alpha=0.3)
+    ax.barh(range(top_n), top_importances, color='#3b82f6', alpha=0.8)
 
-    plt.suptitle('Feature Importance — Most Discriminative Access Points', fontsize=14, fontweight='bold')
+    ax.set_yticks(range(top_n))
+    ax.set_yticklabels(top_features, fontsize=6)
+
+    ax.set_xlabel('Feature Importance')
+    ax.set_title('Random Forest — Top Access Points for Room Classification', fontweight='bold')
+
+    ax.grid(axis='x', alpha=0.3)
+
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'feature_importance.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'feature_importance.pdf'), bbox_inches="tight")
     plt.close()
-    print(f"[Evaluate] Saved feature_importance.png")
+
+    print("[Evaluate] Saved feature_importance.pdf")
 
 
 def learning_curve_analysis(X_train, y_train, output_dir):
@@ -121,7 +126,7 @@ def learning_curve_analysis(X_train, y_train, output_dir):
                              max_iter=500, early_stopping=True, random_state=42),
     }
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(6, 5))
     axes = axes.flatten()
 
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
@@ -156,12 +161,13 @@ def learning_curve_analysis(X_train, y_train, output_dir):
         ax.set_title(name, fontweight='bold')
         ax.legend(loc='lower right')
         ax.grid(alpha=0.3)
+        ax.set_ylim(0.4, 1.02)
 
     plt.suptitle('Learning Curves — Would More Data Help?', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'learning_curves.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'learning_curves.pdf'), dpi=150)
     plt.close()
-    print(f"[Evaluate] Saved learning_curves.png")
+    print(f"[Evaluate] Saved learning_curves.pdf")
 
 
 def misclassification_analysis(results, label_encoder, output_dir):
