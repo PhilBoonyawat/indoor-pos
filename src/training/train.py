@@ -1,5 +1,5 @@
 """
-train.py — Train and compare 5 classification models for WiFi fingerprint room prediction.
+train.py — Train and compare 4 classification models for Wi-Fi fingerprint room prediction.
 
 Models: Weighted KNN, Random Forest, MLP, SVM
 
@@ -38,10 +38,19 @@ from sklearn.metrics import (
 # Plotting
 try:
     import matplotlib
-    matplotlib.use('Agg')  # Non-interactive backend
+    matplotlib.use('pdf')  # Non-interactive backend
     import matplotlib.pyplot as plt
     import seaborn as sns
     HAS_PLOTTING = True
+
+    matplotlib.rcParams.update({
+        "text.usetex": True,
+        "font.family": "serif",
+        "text.latex.preamble": r"\usepackage{amsmath}"
+    })
+
+    plt.style.use("seaborn-v0_8-paper")
+    plt.rcParams["figure.figsize"] = (6,4)
 except ImportError:
     HAS_PLOTTING = False
     print("[Warning] matplotlib/seaborn not installed. Skipping plots.")
@@ -202,7 +211,7 @@ def plot_comparison(results, label_encoder, output_dir):
     test_f1s = [results[n]['test_f1'] for n in names]
 
     # ── 1. Accuracy Comparison Bar Chart ─────────
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     x = np.arange(len(names))
     width = 0.35
 
@@ -229,13 +238,13 @@ def plot_comparison(results, label_encoder, output_dir):
                     xytext=(0, 5), textcoords="offset points", ha='center', fontsize=9)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'model_comparison.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'model_comparison.pdf'), dpi=150)
     plt.close()
-    print(f"\n[Plot] Saved model_comparison.png")
+    print(f"\n[Plot] Saved model_comparison.pdf")
 
     # ── 2. Confusion Matrices ────────────────────
     n_models = len(names)
-    fig, axes = plt.subplots(1, n_models, figsize=(5 * n_models, 5))
+    fig, axes = plt.subplots(1, n_models, figsize=(4 * n_models, 3.5))
     if n_models == 1:
         axes = [axes]
 
@@ -252,12 +261,12 @@ def plot_comparison(results, label_encoder, output_dir):
 
     plt.suptitle('Confusion Matrices — Per Model', fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'confusion_matrices.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, 'confusion_matrices.pdf'), dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"[Plot] Saved confusion_matrices.png")
+    print(f"[Plot] Saved confusion_matrices.pdf")
 
     # ── 3. Training & Prediction Time ────────────
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3.5))
 
     train_times = [results[n]['train_time'] for n in names]
     predict_times = [results[n]['predict_time'] * 1000 for n in names]  # ms
@@ -266,22 +275,22 @@ def plot_comparison(results, label_encoder, output_dir):
     ax1.set_xlabel('Time (seconds)')
     ax1.set_title('Training Time', fontweight='bold')
     for i, v in enumerate(train_times):
-        ax1.text(v + 0.01, i, f'{v:.2f}s', va='center', fontsize=9)
+        ax1.text(v + 0.02, i, f'{v:.2f}s', va='center', fontsize=9)
 
     ax2.barh(names, predict_times, color='#8b5cf6', alpha=0.9)
     ax2.set_xlabel('Time (milliseconds)')
     ax2.set_title('Prediction Time (full test set)', fontweight='bold')
     for i, v in enumerate(predict_times):
-        ax2.text(v + 0.01, i, f'{v:.1f}ms', va='center', fontsize=9)
+        ax2.text(v + 0.02, i, f'{v:.1f}ms', va='center', fontsize=9)
 
     plt.suptitle('Computational Performance', fontsize=14, fontweight='bold')
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'timing_comparison.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'timing_comparison.pdf'), dpi=150)
     plt.close()
-    print(f"[Plot] Saved timing_comparison.png")
+    print(f"[Plot] Saved timing_comparison.pdf")
 
     # ── 4. Cross-Validation Box Plot ─────────────
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     cv_data = [results[n]['cv_scores'] for n in names]
     bp = ax.boxplot(cv_data, labels=names, patch_artist=True)
 
@@ -294,9 +303,9 @@ def plot_comparison(results, label_encoder, output_dir):
     ax.set_title('Cross-Validation Accuracy Distribution', fontsize=14, fontweight='bold')
     ax.grid(axis='y', alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'cv_boxplot.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'cv_boxplot.pdf'), dpi=150)
     plt.close()
-    print(f"[Plot] Saved cv_boxplot.png")
+    print(f"[Plot] Saved cv_boxplot.pdf")
 
 
 # ── Export ────────────────────────────────────────────────────
@@ -409,7 +418,7 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
     temporal_accs = [temporal_results[n]['test_accuracy'] for n in names]
 
     # ── 1. Side-by-side accuracy comparison ──────
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(6, 4))
     x = np.arange(len(names))
     width = 0.35
 
@@ -420,7 +429,7 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
     ax.set_title('Data Leakage Test — Random vs Temporal Split', fontsize=14, fontweight='bold')
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=15, ha='right')
-    ax.legend()
+    ax.legend(loc='lower right')
     ax.set_ylim(max(0, min(temporal_accs) - 0.1), 1.02)
     ax.grid(axis='y', alpha=0.3)
 
@@ -434,13 +443,13 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
                     xytext=(0, 5), textcoords="offset points", ha='center', fontsize=9)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'leakage_test.png'), dpi=150)
+    plt.savefig(os.path.join(output_dir, 'leakage_test.pdf'), dpi=150)
     plt.close()
-    print(f"\n[Plot] Saved leakage_test.png")
+    print(f"\n[Plot] Saved leakage_test.pdf")
 
     # ── 2. Temporal confusion matrices ───────────
     n_models = len(names)
-    fig, axes = plt.subplots(1, n_models, figsize=(5 * n_models, 5))
+    fig, axes = plt.subplots(1, n_models, figsize=(4 * n_models, 3.5))
     if n_models == 1:
         axes = [axes]
 
@@ -457,9 +466,9 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
 
     plt.suptitle('Temporal Split — Confusion Matrices', fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'temporal_confusion_matrices.png'), dpi=150, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, 'temporal_confusion_matrices.pdf'), dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"[Plot] Saved temporal_confusion_matrices.png")
+    print(f"[Plot] Saved temporal_confusion_matrices.pdf")
 
 
 # ── Main ─────────────────────────────────────────────────────

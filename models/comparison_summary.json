@@ -5,7 +5,7 @@
     "test_accuracy": 1.0,
     "test_f1_weighted": 1.0,
     "train_time_seconds": 0.001,
-    "predict_time_seconds": 0.09294,
+    "predict_time_seconds": 0.09271,
     "config": "K=5, distance-weighted, Manhattan distance"
   },
   "Random Forest": {
@@ -13,8 +13,8 @@
     "cv_accuracy_std": 0.0,
     "test_accuracy": 1.0,
     "test_f1_weighted": 1.0,
-    "train_time_seconds": 0.207,
-    "predict_time_seconds": 0.02693,
+    "train_time_seconds": 0.206,
+    "predict_time_seconds": 0.02678,
     "config": "200 trees, sqrt features, no max depth"
   },
   "SVM": {
@@ -22,8 +22,8 @@
     "cv_accuracy_std": 0.0,
     "test_accuracy": 1.0,
     "test_f1_weighted": 1.0,
-    "train_time_seconds": 0.21,
-    "predict_time_seconds": 0.01899,
+    "train_time_seconds": 0.211,
+    "predict_time_seconds": 0.01916,
     "config": "RBF kernel, C=10, gamma=scale"
   },
   "MLP": {
@@ -31,8 +31,8 @@
     "cv_accuracy_std": 0.0038,
     "test_accuracy": 0.9986,
     "test_f1_weighted": 0.9986,
-    "train_time_seconds": 0.435,
-    "predict_time_seconds": 0.00091,
+    "train_time_seconds": 0.452,
+    "predict_time_seconds": 0.00104,
     "config": "3 layers (256\u2192128\u219264), ReLU, Adam, early stopping"
   },
   "_best_model": "Weighted KNN",
