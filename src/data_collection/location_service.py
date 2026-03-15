@@ -36,7 +36,7 @@ def retrieve_current_location():
 
     manager.setDelegate_(delegate)
 
-    # this should prompt permission access if in infoplist
+    # if listed in Info.plist, this will prompt the user for permission
     manager.requestWhenInUseAuthorization()
     manager.startUpdatingLocation()
 
