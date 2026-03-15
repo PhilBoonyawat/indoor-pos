@@ -1,5 +1,5 @@
 """
-preprocess.py — Extract WiFi fingerprints from SQLite and prepare for model training.
+preprocess.py — Extract Wi-Fi fingerprints from SQLite and prepare for model training.
 
 Usage:
     from preprocess import load_and_preprocess
@@ -20,6 +20,9 @@ def load_fingerprints_from_db(db_path):
     Each row = one scan (identified by scan_id)
     Each column = one unique BSSID (access point)
     Values = RSSI signal strength (-100 for missing APs)
+
+    Inputs:
+        db_path: path to SQLite database containing Wi-Fi scans
     
     Returns:
         fingerprints: DataFrame with BSSIDs as columns, scans as rows
@@ -76,6 +79,14 @@ def filter_low_variance_aps(fingerprints, min_detection_rate=0.05):
     """
     Remove APs that are detected in fewer than min_detection_rate of scans.
     These APs add noise without useful signal.
+    
+    Inputs:
+        fingerprints: DataFrame of RSSI values (rows=scans, columns=BSSIDs)
+        min_detection_rate: minimum fraction of scans in which AP must be detected to keep it (avoiding noisy features),
+                            default value of 0.05 means AP must be detected in at least 5% of scans to be kept
+
+    Returns:
+        Filtered DataFrame with only APs that meet the detection threshold
     """
     detection_rate = (fingerprints > -100).mean()
     keep_aps = detection_rate[detection_rate >= min_detection_rate].index
@@ -92,14 +103,21 @@ def normalise_rssi(fingerprints):
     Min-max normalise RSSI values to [0, 1].
     -100 (not detected) → 0.0
     0 (max signal) → 1.0
+
+    Inputs:
+        fingerprints: DataFrame of RSSI values (rows=scans, columns=BSSIDs)
+
+    Returns:
+        normalised: DataFrame of normalised RSSI values
+        scaler: fitted MinMaxScaler (for transforming new data with the same scaling)
     """
     scaler = MinMaxScaler()
-    normalised = pd.DataFrame(
+    normalised_df = pd.DataFrame(
         scaler.fit_transform(fingerprints),
         index=fingerprints.index,
         columns=fingerprints.columns
     )
-    return normalised, scaler
+    return normalised_df, scaler
 
 
 def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_rate=0.05):
@@ -110,6 +128,12 @@ def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_r
     3. Normalise RSSI to [0, 1]
     4. Encode room labels
     5. Train/test split (stratified)
+
+    Inputs:
+        db_path: path to SQLite database
+        test_size: fraction of data to reserve for testing (default: 0.2)
+        random_state: random seed for reproducibility (default: 42)
+        min_detection_rate: minimum fraction of scans in which AP must be detected to keep it (default: 0.05)
     
     Returns:
         X_train, X_test: numpy arrays of normalised fingerprints
@@ -168,6 +192,18 @@ def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.0
     
     For each room, the first 80% of scans (chronologically) go to
     training, and the last 20% go to testing.
+
+    Inputs:
+        db_path: path to SQLite database
+        test_ratio: fraction of scans per room to reserve for testing (default: 0.2)
+        min_detection_rate: minimum fraction of scans in which AP must be detected to keep it (default: 0.05)
+
+    Returns:
+        X_train, X_test: numpy arrays of normalised fingerprints
+        y_train, y_test: numpy arrays of encoded labels
+        feature_names: list of BSSID column names
+        label_encoder: fitted LabelEncoder (for decoding predictions)
+        scaler: fitted MinMaxScaler (for transforming new data)
     """
     print("=" * 50)
     print("  Preprocessing Pipeline (TEMPORAL SPLIT)")
@@ -251,9 +287,8 @@ def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.0
 
     return X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler
 
-
 if __name__ == "__main__":
     import sys
     db_path = sys.argv[1] if len(sys.argv) > 1 else "../../data/raw/wifi_scans.db"
     X_train, X_test, y_train, y_test, features, le, scaler = load_and_preprocess(db_path)
-    print(f"\nReady to train! {X_train.shape[1]} features, {len(le.classes_)} rooms")
+    print(f"\nReady to train! {X_train.shape[1]} features, {len(le.classes_)} rooms, {X_train.shape[0]} training samples, {X_test.shape[0]} test samples.")
