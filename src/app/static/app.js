@@ -3,7 +3,7 @@
 // ============================================================
 const CONFIG = {
     // Floor plan image
-    floorPlanUrl: "/static/floorplan.png",
+    floorPlanUrl: "/static/Level7Floor.png",
     floorPlanWidth: 858,
     floorPlanHeight: 782,
 
