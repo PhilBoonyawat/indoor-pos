@@ -36,24 +36,19 @@ from sklearn.metrics import (
 )
 
 # Plotting
-try:
-    import matplotlib
-    matplotlib.use('pdf')  # Non-interactive backend
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    HAS_PLOTTING = True
+import matplotlib
+matplotlib.use('pdf')  # Non-interactive backend
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-    matplotlib.rcParams.update({
-        "text.usetex": True,
-        "font.family": "serif",
-        "text.latex.preamble": r"\usepackage{amsmath}"
-    })
+matplotlib.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "text.latex.preamble": r"\usepackage{amsmath}"
+})
 
-    plt.style.use("seaborn-v0_8-paper")
-    plt.rcParams["figure.figsize"] = (6,4)
-except ImportError:
-    HAS_PLOTTING = False
-    print("[Warning] matplotlib/seaborn not installed. Skipping plots.")
+plt.style.use("seaborn-v0_8-paper")
+plt.rcParams["figure.figsize"] = (6,4)
 
 from preprocess import load_and_preprocess, load_and_preprocess_temporal
 
@@ -63,7 +58,12 @@ warnings.filterwarnings('ignore')
 # ── Model Definitions ────────────────────────────────────────
 
 def get_models():
-    """Return dict of model name → (model instance, param description)."""
+    """
+    Define the 4 classification models with chosen hyperparameters.
+
+    Returns:
+        dict of model name → (model instance, description)
+    """
     models = {
         "Weighted KNN": (
             KNeighborsClassifier(
@@ -200,10 +200,6 @@ def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, 
 
 def plot_comparison(results, label_encoder, output_dir):
     """Generate comparison plots."""
-    if not HAS_PLOTTING:
-        print("[Warning] Skipping plots — install matplotlib and seaborn")
-        return
-
     names = list(results.keys())
     cv_means = [results[n]['cv_mean'] for n in names]
     cv_stds = [results[n]['cv_std'] for n in names]
@@ -410,9 +406,6 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
 
 def plot_leakage_comparison(random_results, temporal_results, label_encoder, output_dir):
     """Compare random split vs temporal split accuracy to detect leakage."""
-    if not HAS_PLOTTING:
-        return
-
     names = [n for n in random_results.keys() if n in temporal_results]
     random_accs = [random_results[n]['test_accuracy'] for n in names]
     temporal_accs = [temporal_results[n]['test_accuracy'] for n in names]
