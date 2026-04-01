@@ -4,9 +4,8 @@ train.py — Train and compare 4 classification models for Wi-Fi fingerprint roo
 Models: Weighted KNN, Random Forest, MLP, SVM
 
 Usage:
-    python train.py                              # Uses default DB path
-    python train.py --db path/to/wifi_scans.db   # Custom DB path
-    python train.py --db path/to/db --output ./models/
+    python train.py                              # Uses default DB path and output directory
+    python train.py --db ../../data/raw/wifi_scans.db --output ../../models
 
 Outputs:
     - Trained model files (.pkl) in output directory
@@ -16,17 +15,15 @@ Outputs:
 
 import argparse
 import os
-import sys
 import json
 import time
 import warnings
 import numpy as np
 import joblib
 
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
+from preprocess import load_and_preprocess, load_and_preprocess_temporal
+
+from model_loader import load_models_from_config
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.metrics import (
     classification_report,
@@ -34,10 +31,10 @@ from sklearn.metrics import (
     accuracy_score,
     f1_score
 )
+from sklearn.base import clone
 
-# Plotting
 import matplotlib
-matplotlib.use('pdf')  # Non-interactive backend
+matplotlib.use('pdf') 
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -50,78 +47,52 @@ matplotlib.rcParams.update({
 plt.style.use("seaborn-v0_8-paper")
 plt.rcParams["figure.figsize"] = (6,4)
 
-from preprocess import load_and_preprocess, load_and_preprocess_temporal
-
 warnings.filterwarnings('ignore')
 
+DEFAULT_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'model_configs.json'
+)
 
-# ── Model Definitions ────────────────────────────────────────
+FIG_OUTPUT_DIRECTORY = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'assets', 'model_training', 'comparisons'
+)
 
-def get_models():
+MODEL_OUTPUT_DIRECTORY = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'models'
+)
+
+DATABASE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'data', 'raw', 'wifi_scans.db'
+)
+
+def get_models(model_config_path=DEFAULT_CONFIG_PATH):
     """
-    Define the 4 classification models with chosen hyperparameters.
+    Load model configurations from model_configs.json and create scikit-learn model instances.
+
+    Args:
+        model_config_path: path to model_configs.json
 
     Returns:
-        dict of model name → (model instance, description)
+        dict of {model_name: (model_instance, description_string)}
     """
-    models = {
-        "Weighted KNN": (
-            KNeighborsClassifier(
-                n_neighbors=5,
-                weights='distance',      # inverse distance weighting
-                metric='manhattan',       # works well for RSSI
-                n_jobs=-1
-            ),
-            "K=5, distance-weighted, Manhattan distance"
-        ),
-        "Random Forest": (
-            RandomForestClassifier(
-                n_estimators=200,
-                max_features='sqrt',
-                max_depth=None,           # let trees grow fully
-                min_samples_split=5,
-                min_samples_leaf=2,
-                random_state=42,
-                n_jobs=-1
-            ),
-            "200 trees, sqrt features, no max depth"
-        ),
-        "SVM": (
-            SVC(
-                kernel='rbf',
-                C=10,
-                gamma='scale',
-                random_state=42,
-                probability=True          # needed for confidence scores
-            ),
-            "RBF kernel, C=10, gamma=scale"
-        ),
-        "MLP": (
-            MLPClassifier(
-                hidden_layer_sizes=(256, 128, 64),
-                activation='relu',
-                solver='adam',
-                learning_rate='adaptive',
-                learning_rate_init=0.001,
-                max_iter=500,
-                early_stopping=True,
-                validation_fraction=0.15,
-                n_iter_no_change=20,
-                random_state=42
-            ),
-            "3 layers (256→128→64), ReLU, Adam, early stopping"
-        ),
-    }
-
-    return models
-
-
-# ── Training & Evaluation ────────────────────────────────────
+    return load_models_from_config(model_config_path)
 
 def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, cv_folds=5):
     """
     Train each model, run cross-validation, evaluate on test set.
-    Returns dict of results per model.
+    
+    Args:
+        models: dict of {model_name: (model_instance, description_string)}
+        X_train, X_test, y_train, y_test: preprocessed data
+        label_encoder: fitted LabelEncoder for room labels
+        cv_folds: number of cross-validation folds (default: 5)
+
+    Returns:
+        dict of {model_name: {cv_scores, test_accuracy, test_f1, confusion_matrix, report, train_time, predict_time, y_pred, description}}
     """
     results = {}
     cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
@@ -138,11 +109,11 @@ def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, 
 
         # Cross-validation
         start = time.time()
-        cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring='accuracy', n_jobs=-1)
+        cv_scores = cross_val_score(model, X_train, y_train, cv=cv, scoring='f1_weighted', n_jobs=-1)
         cv_time = time.time() - start
 
-        print(f"  CV Accuracy:  {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
-        print(f"  CV Folds:     {cv_scores}")
+        print(f"  CV F1 (weighted):  {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
+        print(f"  CV F1 Scores:     {cv_scores}")
         print(f"  CV Time:      {cv_time:.2f}s")
 
         # Train on full training set
@@ -160,12 +131,12 @@ def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, 
         test_f1 = f1_score(y_test, y_pred, average='weighted')
         cm = confusion_matrix(y_test, y_pred)
         report = classification_report(
-            y_test, y_pred,
+            y_test, y_pred, digits=4,
             target_names=label_encoder.classes_,
             output_dict=True
         )
         report_str = classification_report(
-            y_test, y_pred,
+            y_test, y_pred, digits=4,
             target_names=label_encoder.classes_
         )
 
@@ -196,29 +167,38 @@ def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, 
     return results
 
 
-# ── Plotting ─────────────────────────────────────────────────
+def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
+    """
+    Create comparison plots:
+    1. Bar chart of CV F1 vs Test F1 for each model
+    2. Confusion matrices for each model
+    3. Training time and prediction time comparison
+    4. Box plot of CV F1 score distributions
 
-def plot_comparison(results, label_encoder, output_dir):
-    """Generate comparison plots."""
-    names = list(results.keys())
-    cv_means = [results[n]['cv_mean'] for n in names]
-    cv_stds = [results[n]['cv_std'] for n in names]
-    test_accs = [results[n]['test_accuracy'] for n in names]
-    test_f1s = [results[n]['test_f1'] for n in names]
+    Args:
+        results: dict of {model_name: {cv_scores, test_accuracy, test_f1, confusion_matrix, report, train_time, predict_time, y_pred, description}}
+        label_encoder: fitted LabelEncoder for room labels
+        output_dir: directory to save plots
+    """
+    model_names = list(results.keys())
+    cv_means = [results[n]['cv_mean'] for n in model_names]
+    cv_stds = [results[n]['cv_std'] for n in model_names]
+    test_f1s = [results[n]['test_f1'] for n in model_names]
 
-    # ── 1. Accuracy Comparison Bar Chart ─────────
+    # ── 1. F1 Score Comparison Bar Chart ─────────
     fig, ax = plt.subplots(figsize=(6, 4))
-    x = np.arange(len(names))
+    x = np.arange(len(model_names))
     width = 0.35
 
-    bars1 = ax.bar(x - width/2, cv_means, width, label='CV Accuracy', color='#3b82f6',
+    bars1 = ax.bar(x - width/2, cv_means, width, label='CV F1 (weighted)', color='#3b82f6',
                    yerr=cv_stds, capsize=5, alpha=0.9)
-    bars2 = ax.bar(x + width/2, test_accs, width, label='Test Accuracy', color='#10b981', alpha=0.9)
+    bars2 = ax.bar(x + width/2, test_f1s, width,
+                   label='Test F1 (weighted)')
 
-    ax.set_ylabel('Accuracy', fontsize=12)
+    ax.set_ylabel('F1 Score', fontsize=12)
     ax.set_title('Model Comparison — WiFi Fingerprint Room Classification', fontsize=14, fontweight='bold')
     ax.set_xticks(x)
-    ax.set_xticklabels(names, rotation=15, ha='right')
+    ax.set_xticklabels(model_names, rotation=15, ha='right')
     ax.legend(loc='lower right')
     ax.set_ylim(max(0, min(cv_means) - 0.15), 1.02)
     ax.grid(axis='y', alpha=0.3)
@@ -239,12 +219,12 @@ def plot_comparison(results, label_encoder, output_dir):
     print(f"\n[Plot] Saved model_comparison.pdf")
 
     # ── 2. Confusion Matrices ────────────────────
-    n_models = len(names)
+    n_models = len(model_names)
     fig, axes = plt.subplots(1, n_models, figsize=(4 * n_models, 3.5))
     if n_models == 1:
         axes = [axes]
 
-    for ax, name in zip(axes, names):
+    for ax, name in zip(axes, model_names):
         cm = results[name]['confusion_matrix']
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
                     xticklabels=label_encoder.classes_,
@@ -264,16 +244,16 @@ def plot_comparison(results, label_encoder, output_dir):
     # ── 3. Training & Prediction Time ────────────
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3.5))
 
-    train_times = [results[n]['train_time'] for n in names]
-    predict_times = [results[n]['predict_time'] * 1000 for n in names]  # ms
+    train_times = [results[n]['train_time'] for n in model_names]
+    predict_times = [results[n]['predict_time'] * 1000 for n in model_names]  # ms
 
-    ax1.barh(names, train_times, color='#f59e0b', alpha=0.9)
+    ax1.barh(model_names, train_times, color='#f59e0b', alpha=0.9)
     ax1.set_xlabel('Time (seconds)')
     ax1.set_title('Training Time', fontweight='bold')
     for i, v in enumerate(train_times):
         ax1.text(v + 0.02, i, f'{v:.2f}s', va='center', fontsize=9)
 
-    ax2.barh(names, predict_times, color='#8b5cf6', alpha=0.9)
+    ax2.barh(model_names, predict_times, color='#8b5cf6', alpha=0.9)
     ax2.set_xlabel('Time (milliseconds)')
     ax2.set_title('Prediction Time (full test set)', fontweight='bold')
     for i, v in enumerate(predict_times):
@@ -287,30 +267,39 @@ def plot_comparison(results, label_encoder, output_dir):
 
     # ── 4. Cross-Validation Box Plot ─────────────
     fig, ax = plt.subplots(figsize=(6, 4))
-    cv_data = [results[n]['cv_scores'] for n in names]
-    bp = ax.boxplot(cv_data, labels=names, patch_artist=True)
+    cv_data = [results[n]['cv_scores'] for n in model_names]
+    bp = ax.boxplot(cv_data, labels=model_names, patch_artist=True)
 
     colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
-    for patch, color in zip(bp['boxes'], colors[:len(names)]):
+    for patch, color in zip(bp['boxes'], colors[:len(model_names)]):
         patch.set_facecolor(color)
         patch.set_alpha(0.6)
 
-    ax.set_ylabel('Accuracy')
-    ax.set_title('Cross-Validation Accuracy Distribution', fontsize=14, fontweight='bold')
+    ax.set_ylabel('F1 Score')
+    ax.set_title('Cross-Validation F1 Score Distribution', fontsize=14, fontweight='bold')
     ax.grid(axis='y', alpha=0.3)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'cv_boxplot.pdf'), dpi=150)
     plt.close()
     print(f"[Plot] Saved cv_boxplot.pdf")
 
+def export_models(results, label_encoder, scaler, feature_names, output_dir=MODEL_OUTPUT_DIRECTORY):
+    """
+    Save trained models and metadata.
+    
+    Args:
+        results: dict of {model_name: {model, cv_scores, test_accuracy, test_f1, confusion_matrix, report, train_time, predict_time, y_pred, description}}
+        label_encoder: fitted LabelEncoder for room labels
+        scaler: fitted scaler for feature normalization
+        feature_names: list of feature names (BSSIDs)
+        output_dir: directory to save models and metadata
 
-# ── Export ────────────────────────────────────────────────────
-
-def export_models(results, label_encoder, scaler, feature_names, output_dir):
-    """Save trained models and metadata."""
+    Returns:
+        name of best model (highest test F1 score)
+    """
     os.makedirs(output_dir, exist_ok=True)
 
-    # Save each model
+    # Save models
     for name, data in results.items():
         safe_name = name.lower().replace(' ', '_')
         model_path = os.path.join(output_dir, f'{safe_name}.pkl')
@@ -332,16 +321,16 @@ def export_models(results, label_encoder, scaler, feature_names, output_dir):
 
     for name, data in results.items():
         summary[name] = {
-            'cv_accuracy_mean': round(data['cv_mean'], 4),
-            'cv_accuracy_std': round(data['cv_std'], 4),
+            'cv_f1_mean': round(data['cv_mean'], 4),
+            'cv_f1_std': round(data['cv_std'], 4),
             'test_accuracy': round(data['test_accuracy'], 4),
             'test_f1_weighted': round(data['test_f1'], 4),
             'train_time_seconds': round(data['train_time'], 3),
             'predict_time_seconds': round(data['predict_time'], 5),
             'config': data['description']
         }
-        if data['test_accuracy'] > best_acc:
-            best_acc = data['test_accuracy']
+        if data['test_f1'] > best_acc:
+            best_acc = data['test_f1']
             best_model = name
 
     summary['_best_model'] = best_model
@@ -356,12 +345,17 @@ def export_models(results, label_encoder, scaler, feature_names, output_dir):
     return best_model
 
 
-# ── Temporal Validation (Data Leakage Test) ──────────────────
-
 def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder):
     """
-    Train on earlier scans, test on later scans.
-    If accuracy drops significantly vs random split, there's data leakage.
+    Perform temporal validation to test for data leakage. Train on early scans and test on later scans.
+
+    Args:
+        models: dict of {model_name: (model_instance, description_string)}
+        X_train, X_test, y_train, y_test: preprocessed data for temporal split
+        label_encoder: fitted LabelEncoder for room labels
+
+    Returns:
+        dict of {model_name: {test_accuracy, test_f1, confusion_matrix, y_pred}}
     """
     print("\n" + "=" * 60)
     print("  TEMPORAL VALIDATION — Data Leakage Test")
@@ -372,7 +366,6 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
 
     for name, (model, desc) in models.items():
         # Create a fresh model instance (don't reuse fitted model)
-        from sklearn.base import clone
         fresh_model = clone(model)
 
         fresh_model.fit(X_train, y_train)
@@ -385,6 +378,7 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
         report_str = classification_report(
             y_test, y_pred,
             target_names=label_encoder.classes_
+            , digits=4
         )
 
         print(f"\n  {name}")
@@ -404,8 +398,18 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
     return temporal_results
 
 
-def plot_leakage_comparison(random_results, temporal_results, label_encoder, output_dir):
-    """Compare random split vs temporal split accuracy to detect leakage."""
+def plot_leakage_comparison(random_results, temporal_results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
+    """
+    Create comparison plots for data leakage test:
+    1. Side-by-side bar chart of test accuracy for random split vs temporal split
+    2. Confusion matrices for temporal split
+
+    Args:
+        random_results: dict of {model_name: {test_accuracy, ...}} from random split
+        temporal_results: dict of {model_name: {test_accuracy, confusion_matrix, ...}}
+        label_encoder: fitted LabelEncoder for room labels
+        output_dir: directory to save plots
+    """
     names = [n for n in random_results.keys() if n in temporal_results]
     random_accs = [random_results[n]['test_accuracy'] for n in names]
     temporal_accs = [temporal_results[n]['test_accuracy'] for n in names]
@@ -463,14 +467,22 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
     plt.close()
     print(f"[Plot] Saved temporal_confusion_matrices.pdf")
 
+def parse_args():
+    """
+    Parse command-line arguments for training script.
 
-# ── Main ─────────────────────────────────────────────────────
-
-def main():
+    Returns:
+        argparse.Namespace with attributes:
+            db: path to SQLite database (default: ../../data/raw/wifi_scans.db)
+            output: output directory for trained models (default: ../../models/)
+            test_size: test set proportion (default: 0.2)
+            cv_folds: number of cross-validation folds (default: 5)
+            min_detection_rate: minimum AP detection rate to keep (default: 0.05)   
+    """
     parser = argparse.ArgumentParser(description="Train WiFi fingerprint room classifiers")
-    parser.add_argument('--db', type=str, default='../../data/raw/wifi_scans.db',
+    parser.add_argument('--db', type=str, default=DATABASE_PATH,
                         help='Path to SQLite database')
-    parser.add_argument('--output', type=str, default='../../models/',
+    parser.add_argument('--output', type=str, default=MODEL_OUTPUT_DIRECTORY,
                         help='Output directory for trained models')
     parser.add_argument('--test-size', type=float, default=0.2,
                         help='Test set proportion (default: 0.2)')
@@ -478,10 +490,23 @@ def main():
                         help='Number of cross-validation folds (default: 5)')
     parser.add_argument('--min-detection-rate', type=float, default=0.05,
                         help='Min AP detection rate to keep (default: 0.05)')
+    return parser.parse_args()
 
-    args = parser.parse_args()
 
-    # Resolve paths relative to this script
+def main():
+    """
+    Main function to run the training and evaluation pipeline:
+    1. Load and preprocess data from SQLite database
+    2. Load model configurations and create model instances
+    3. Train each model and evaluate on test set
+    4. Create comparison plots
+    5. Export trained models and metadata
+    6. Run temporal validation to test for data leakage
+    7. Print final summary of results and leakage assessment
+    """
+    args = parse_args()
+
+    # # Resolve paths relative to this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(script_dir, args.db) if not os.path.isabs(args.db) else args.db
     output_dir = os.path.join(script_dir, args.output) if not os.path.isabs(args.output) else args.output
@@ -531,12 +556,12 @@ def main():
     print("\n" + "=" * 60)
     print("  FINAL RESULTS")
     print("=" * 60)
-    print(f"\n  {'Model':<20} {'CV Acc':>10} {'Random':>10} {'Temporal':>10} {'Diff':>10}")
+    print(f"\n  {'Model':<20} {'CV F1':>10} {'Random':>10} {'Temporal':>10} {'Diff':>10}")
     print(f"  {'─' * 60}")
 
-    for name in sorted(results.keys(), key=lambda n: results[n]['test_accuracy'], reverse=True):
+    for name in sorted(results.keys(), key=lambda n: results[n]['test_f1'], reverse=True):
         r = results[name]
-        t_acc = temporal_results[name]['test_accuracy'] if name in temporal_results else 0
+        t_acc = temporal_results[name]['test_accuracy']
         diff = r['test_accuracy'] - t_acc
         marker = " ← BEST" if name == best_model else ""
         print(f"  {name:<20} {r['cv_mean']:>9.4f} {r['test_accuracy']:>10.4f} {t_acc:>10.4f} {diff:>+10.4f}{marker}")
@@ -551,14 +576,14 @@ def main():
     print(f"  Gap:                    {gap:+.4f}")
 
     if gap < 0.02:
-        print(f"\n  ✅ MINIMAL LEAKAGE — gap < 2%. Results are trustworthy.")
-        print(f"     The model generalises well across time.")
+        print(f"\n  MINIMAL LEAKAGE — gap < 2%. Results are trustworthy.")
+        print(f"  The model generalises well across time.")
     elif gap < 0.10:
-        print(f"\n  ⚠️  MODERATE LEAKAGE — gap {gap:.1%}. Some temporal correlation.")
-        print(f"     Random split may be slightly optimistic. Temporal accuracy is more realistic.")
+        print(f"\n  MODERATE LEAKAGE — gap {gap:.1%}. Some temporal correlation.")
+        print(f"  Random split may be slightly optimistic. Temporal accuracy is more realistic.")
     else:
-        print(f"\n  ❌ SIGNIFICANT LEAKAGE — gap {gap:.1%}. Consecutive scans are too similar.")
-        print(f"     Use temporal split results as your true accuracy.")
+        print(f"\n  SIGNIFICANT LEAKAGE — gap {gap:.1%}. Consecutive scans are too similar.")
+        print(f"  Use temporal split results as your true accuracy.")
 
     print(f"\n  Best model: {best_model} ({results[best_model]['test_accuracy']:.4f} random / {temporal_results.get(best_model, {}).get('test_accuracy', 0):.4f} temporal)")
     print(f"  Models saved to: {output_dir}")

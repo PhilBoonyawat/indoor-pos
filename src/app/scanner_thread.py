@@ -151,7 +151,9 @@ class ScannerThread:
                 # "Resource busy" is common when scanning too fast
                 # Use the last successful scan instead of failing
                 if "Resource busy" in str(scan_err) and hasattr(self, '_last_live_scan'):
+                    print("[Scanner] Resource busy — using cached scan")
                     return self._last_live_scan
+                print(f"[Scanner] CoreWLAN error: {scan_err}")
                 return None
 
             fingerprint = {}

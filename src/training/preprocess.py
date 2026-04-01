@@ -7,13 +7,18 @@ Usage:
 """
 
 import sqlite3
+import os
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
+DEFAULT_DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'data', 'raw', 'wifi_scans.db'
+)
 
-def load_fingerprints_from_db(db_path):
+def load_fingerprints_from_db(db_path=DEFAULT_DB_PATH):
     """
     Query SQLite database and build a fingerprint matrix.
     
@@ -21,7 +26,7 @@ def load_fingerprints_from_db(db_path):
     Each column = one unique BSSID (access point)
     Values = RSSI signal strength (-100 for missing APs)
 
-    Inputs:
+    Args:
         db_path: path to SQLite database containing Wi-Fi scans
     
     Returns:
@@ -80,7 +85,7 @@ def filter_low_variance_aps(fingerprints, min_detection_rate=0.05):
     Remove APs that are detected in fewer than min_detection_rate of scans.
     These APs add noise without useful signal.
     
-    Inputs:
+    Args:
         fingerprints: DataFrame of RSSI values (rows=scans, columns=BSSIDs)
         min_detection_rate: minimum fraction of scans in which AP must be detected to keep it (avoiding noisy features),
                             default value of 0.05 means AP must be detected in at least 5% of scans to be kept
@@ -104,7 +109,7 @@ def normalise_rssi(fingerprints):
     -100 (not detected) → 0.0
     0 (max signal) → 1.0
 
-    Inputs:
+    Args:
         fingerprints: DataFrame of RSSI values (rows=scans, columns=BSSIDs)
 
     Returns:
@@ -120,7 +125,7 @@ def normalise_rssi(fingerprints):
     return normalised_df, scaler
 
 
-def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_rate=0.05):
+def load_and_preprocess(db_path=DEFAULT_DB_PATH, test_size=0.2, random_state=42, min_detection_rate=0.05):
     """
     Full preprocessing pipeline:
     1. Load fingerprints from SQLite
@@ -129,7 +134,7 @@ def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_r
     4. Encode room labels
     5. Train/test split (stratified)
 
-    Inputs:
+    Args:
         db_path: path to SQLite database
         test_size: fraction of data to reserve for testing (default: 0.2)
         random_state: random seed for reproducibility (default: 42)
@@ -146,16 +151,10 @@ def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_r
     print("  Preprocessing Pipeline")
     print("=" * 50)
 
-    # 1. Load from DB
     fingerprints, labels = load_fingerprints_from_db(db_path)
-
-    # 2. Filter low-variance APs
     fingerprints = filter_low_variance_aps(fingerprints, min_detection_rate)
-
-    # 3. Normalise
     fingerprints_norm, scaler = normalise_rssi(fingerprints)
 
-    # 4. Encode labels
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(labels)
 
@@ -163,7 +162,6 @@ def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_r
     for i, room in enumerate(label_encoder.classes_):
         print(f"  {i} → {room}")
 
-    # 5. Train/test split (stratified to maintain room proportions)
     X_train, X_test, y_train, y_test = train_test_split(
         fingerprints_norm.values,
         y,
@@ -182,7 +180,7 @@ def load_and_preprocess(db_path, test_size=0.2, random_state=42, min_detection_r
     return X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler
 
 
-def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.05):
+def load_and_preprocess_temporal(db_path=DEFAULT_DB_PATH, test_ratio=0.2, min_detection_rate=0.05):
     """
     Temporal split: train on earlier scans, test on later scans.
     
@@ -193,7 +191,7 @@ def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.0
     For each room, the first 80% of scans (chronologically) go to
     training, and the last 20% go to testing.
 
-    Inputs:
+    Args:
         db_path: path to SQLite database
         test_ratio: fraction of scans per room to reserve for testing (default: 0.2)
         min_detection_rate: minimum fraction of scans in which AP must be detected to keep it (default: 0.05)
@@ -229,22 +227,16 @@ def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.0
 
     print(f"[Temporal] Loaded {len(df)} RSSI readings")
 
-    # Pivot to fingerprint matrix
     fingerprints = df.pivot_table(
         index='scan_id', columns='bssid', values='rssi', aggfunc='mean'
     ).fillna(-100)
 
-    # Get labels and timestamps per scan
     scan_info = df.drop_duplicates('scan_id').set_index('scan_id')[['location', 'timestamp']]
     scan_info = scan_info.reindex(fingerprints.index)
 
-    # Filter low-variance APs
     fingerprints = filter_low_variance_aps(fingerprints, min_detection_rate)
-
-    # Normalise
     fingerprints_norm, scaler = normalise_rssi(fingerprints)
 
-    # Encode labels
     label_encoder = LabelEncoder()
     all_labels = label_encoder.fit_transform(scan_info['location'])
 
@@ -286,9 +278,3 @@ def load_and_preprocess_temporal(db_path, test_ratio=0.2, min_detection_rate=0.0
     print("=" * 50)
 
     return X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler
-
-if __name__ == "__main__":
-    import sys
-    db_path = sys.argv[1] if len(sys.argv) > 1 else "../../data/raw/wifi_scans.db"
-    X_train, X_test, y_train, y_test, features, le, scaler = load_and_preprocess(db_path)
-    print(f"\nReady to train! {X_train.shape[1]} features, {len(le.classes_)} rooms, {X_train.shape[0]} training samples, {X_test.shape[0]} test samples.")

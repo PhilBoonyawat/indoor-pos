@@ -1,3 +1,4 @@
+# TODO: review this file
 from CoreWLAN import CWWiFiClient
 from datetime import datetime
 from data_collection.location_service import retrieve_current_location

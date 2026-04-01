@@ -1,40 +1,40 @@
 {
   "Weighted KNN": {
-    "cv_accuracy_mean": 1.0,
-    "cv_accuracy_std": 0.0,
-    "test_accuracy": 1.0,
-    "test_f1_weighted": 1.0,
+    "cv_f1_mean": 1.0,
+    "cv_f1_std": 0.0,
+    "test_accuracy": 0.9978,
+    "test_f1_weighted": 0.9978,
     "train_time_seconds": 0.001,
-    "predict_time_seconds": 0.09271,
-    "config": "K=5, distance-weighted, Manhattan distance"
+    "predict_time_seconds": 0.13228,
+    "config": "n_neighbors=3, weights=distance, metric=manhattan"
   },
   "Random Forest": {
-    "cv_accuracy_mean": 1.0,
-    "cv_accuracy_std": 0.0,
-    "test_accuracy": 1.0,
-    "test_f1_weighted": 1.0,
-    "train_time_seconds": 0.206,
-    "predict_time_seconds": 0.02678,
-    "config": "200 trees, sqrt features, no max depth"
+    "cv_f1_mean": 0.9992,
+    "cv_f1_std": 0.0007,
+    "test_accuracy": 0.9989,
+    "test_f1_weighted": 0.9989,
+    "train_time_seconds": 0.087,
+    "predict_time_seconds": 0.01239,
+    "config": "n_estimators=50, max_features=log2, max_depth=None, min_samples_split=5, min_samples_leaf=1"
   },
   "SVM": {
-    "cv_accuracy_mean": 1.0,
-    "cv_accuracy_std": 0.0,
-    "test_accuracy": 1.0,
-    "test_f1_weighted": 1.0,
-    "train_time_seconds": 0.211,
-    "predict_time_seconds": 0.01916,
-    "config": "RBF kernel, C=10, gamma=scale"
+    "cv_f1_mean": 1.0,
+    "cv_f1_std": 0.0,
+    "test_accuracy": 0.9967,
+    "test_f1_weighted": 0.9967,
+    "train_time_seconds": 0.348,
+    "predict_time_seconds": 0.03831,
+    "config": "kernel=rbf, C=10, gamma=scale"
   },
   "MLP": {
-    "cv_accuracy_mean": 0.9951,
-    "cv_accuracy_std": 0.0038,
-    "test_accuracy": 0.9986,
-    "test_f1_weighted": 0.9986,
-    "train_time_seconds": 0.452,
-    "predict_time_seconds": 0.00104,
-    "config": "3 layers (256\u2192128\u219264), ReLU, Adam, early stopping"
+    "cv_f1_mean": 0.9995,
+    "cv_f1_std": 0.0007,
+    "test_accuracy": 0.9978,
+    "test_f1_weighted": 0.9978,
+    "train_time_seconds": 0.578,
+    "predict_time_seconds": 0.00113,
+    "config": "hidden_layer_sizes=(256, 128), alpha=1e-05, activation=relu, solver=adam, learning_rate=adaptive, learning_rate_init=0.0005, max_iter=500, early_stopping=True, validation_fraction=0.15, n_iter_no_change=20"
   },
-  "_best_model": "Weighted KNN",
-  "_best_accuracy": 1.0
+  "_best_model": "Random Forest",
+  "_best_accuracy": 0.9989
 }
