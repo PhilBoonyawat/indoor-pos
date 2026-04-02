@@ -1,4 +1,14 @@
-# TODO: review this file
+"""
+data_collector_service.py — Collect Wi-Fi scan data using CoreWLAN, retrieve location, and store in SQLite DB.
+
+This script is intended to be run as a subprocess by run_scans.py, which handles repeated scanning and user prompts.
+
+Usage:
+    python3 data_collector_service.py -l "(S)7.05" -f "196 S"
+
+Note: This script is designed for macOS due to its use of the CoreWLAN framework and CoreLocation for GPS data. It will not work on other operating systems without significant modifications.
+"""
+
 from CoreWLAN import CWWiFiClient
 from datetime import datetime
 from data_collection.location_service import retrieve_current_location
@@ -7,6 +17,25 @@ import argparse
 from data_collection.db_service import init_db, store_raw_scan
 
 def scan_for_networks(location, orientation):
+    """
+    Perform a Wi-Fi scan and return a list of dicts with scan data, including location and orientation.
+
+    Args:
+        location: String representing the room/location in the building (EX. "(S)7.05")
+        orientation: String representing the direction the user is facing (EX. "196 S")
+
+    Returns:
+        List of dicts, each containing:
+            - ssid: Wi-Fi network name
+            - bssid: Wi-Fi network BSSID
+            - rssi: Signal strength
+            - noise: Noise measurement
+            - channel: Wi-Fi channel number
+            - timestamp: ISO format timestamp of the scan
+            - location: User-provided location string
+            - latitude: GPS latitude (if available)
+            - longitude: GPS longitude (if available)   
+    """
     currentCoords = retrieve_current_location()
     latitude, longitude = currentCoords if currentCoords else (None, None)
     
@@ -43,12 +72,26 @@ def scan_for_networks(location, orientation):
     return scan_data
     
 def parse_args():
+    """
+    Parse command-line arguments for location and orientation. If not provided, will prompt the user for input.
+
+    Returns:
+        Namespace with 'location' and 'orientation' attributes. 
+    """
+    
     p = argparse.ArgumentParser(description="Collect Wi-Fi scan data")
     p.add_argument("-l", "--location", help="Location in the building in which you are in")
     p.add_argument("-f", "--orientation", help="Please enter the direction you are facing (orientation)")
     return p.parse_args()
 
 def write_data_to_db(location, orientation):
+    """
+    Perform a Wi-Fi scan with the given location and orientation, retrieve GPS coordinates, and store the data in the SQLite database.
+
+    Args:
+        location: String representing the room/location in the building (EX. "(S)7.05")
+        orientation: String representing the direction the user is facing (EX. "196 S")
+    """
 
     if not location:
         raise ValueError("Location is required")
@@ -65,6 +108,11 @@ def write_data_to_db(location, orientation):
         conn.close()
 
 def main():
+    """
+    Main function to parse arguments, perform Wi-Fi scan, and store data in the database. Handles errors gracefully and provides user feedback.
+    The script expects to be run as a subprocess by run_scans.py, which will handle repeated scanning and user prompts. 
+    """
+    
     args = parse_args()
     
     location = args.location or input("Enter your current location: ").strip()

@@ -1,61 +1,18 @@
-# # TODO: review this file
-# import CoreLocation
-# import Foundation
-# import objc
+# TODO: review this file
+"""
+location_service.py — Handles retrieval of GPS coordinates on macOS using CoreLocation. 
 
-# class LocationDelegate(Foundation.NSObject):
-#     def init(self):
-#         self = objc.super(LocationDelegate, self).init()
-#         if self is None:
-#             return None
+Designed to be called by data_collector_service.py during Wi-Fi scans to attach location data to each scan record.
 
-#         self.coordinates = None
-#         self.error = None
-#         return self
-
-#     def locationManager_didUpdateLocations_(self, manager, locations):
-#         loc = locations[-1]
-#         coord = loc.coordinate()
-#         self.coordinates = [coord.latitude, coord.longitude]
-#         print(coord.latitude, coord.longitude)
-
-#         # Stop after first update if you want "current location"
-#         manager.stopUpdatingLocation()
-#         Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
-
-
-#     def locationManager_didFailWithError_(self, manager, error):
-#         self.coordinates = None
-#         self.error = error.localizedDescription()
-#         manager.stopUpdatingLocation()
-#         Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
-
-        
-# def retrieve_current_location():
-#     manager = CoreLocation.CLLocationManager.alloc().init()
-#     delegate = LocationDelegate.alloc().init()
-
-#     manager.setDelegate_(delegate)
-
-#     # if listed in Info.plist, this will prompt the user for permission
-#     manager.requestWhenInUseAuthorization()
-#     manager.startUpdatingLocation()
-
-#     Foundation.CFRunLoopRun()
-
-#     if delegate.error:
-#         raise RuntimeError(f"Location error: {delegate.error}")
-
-#     if delegate.coordinates is None:
-#         raise RuntimeError("Location unavailable")
-
-#     return delegate.coordinates
+Usage:
+    from data_collection.location_service import retrieve_current_location
+    coords = retrieve_current_location()
+"""
 
 import CoreLocation
 import Foundation
 import objc
 import time
-
 
 class LocationDelegate(Foundation.NSObject):
     def init(self):
