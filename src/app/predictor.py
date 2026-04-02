@@ -153,7 +153,7 @@ class Predictor:
 
     def _demo_predict(self):
         """Demo mode — returns simulated predictions for testing the UI."""
-        rooms = ["(S)7.01", "(S)7.02", "(S)7.03", "(S)7.04", "(S)7.05", "(S)7.06"]
+        rooms = ["(S) 7.01", "(S) 7.02", "(S) 7.03", "(S) 7.04", "(S) 7.05", "(S) 7.06"]
         room = random.choice(rooms)
         position = self.room_positions.get(room, {"x": 0, "y": 0})
 

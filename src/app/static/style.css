@@ -232,21 +232,27 @@ h1 span {
     animation: pulse 2s infinite;
 }
 
-/* Room labels on floor plan */
+/* Room labels on floor plan — rendered as divIcon so they
+   scale / pan correctly with the map at all zoom levels */
+.room-label-icon {
+    /* Leaflet resets some styles; clear them */
+    background: transparent !important;
+    border: none !important;
+}
+
 .room-tooltip {
-    background: rgba(17, 24, 39, 0.85);
+    display: inline-block;
+    background: rgba(17, 24, 39, 0.88);
     color: #4ecca3;
     border: 1px solid #4ecca3;
     border-radius: 4px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
     padding: 2px 6px;
-    box-shadow: none;
-}
-
-.room-tooltip::before {
-    border-top-color: #4ecca3;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 
 /* Dark background behind floor plan */
