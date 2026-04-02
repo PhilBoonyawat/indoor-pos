@@ -14,7 +14,7 @@ source venv/bin/activate
 python3 src/data_collection/runs_scans.py -l <LOCATION> -f <ORIENTATION>
 ```
 ### Running the application: spin up backend and frontend
-## If Python does not have access to location service, it will prompt the user to grant it access
+#### If Python does not have access to location service, it will prompt the user to grant it access
 ```bash
 source venv/bin/activate
 python3 run.py --models-dir models/ --port <AVAILABLE_PORT>
