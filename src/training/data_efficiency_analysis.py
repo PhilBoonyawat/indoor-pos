@@ -1,4 +1,3 @@
-# TODO: review this file
 """
 data_efficiency_analysis.py — Test model robustness when training data is reduced.
 
@@ -6,8 +5,7 @@ Trains all 4 models on 100%, 75%, 50%, 25% of training data and compares.
 Shows how each model degrades (or not) with less data.
 
 Usage:
-    cd src/training
-    python3 data_efficiency_analysis.py --db ../../data/raw/wifi_scans.db --output ../../models/
+    python3 src/training/data_efficiency_analysis.py 
 """
 
 import argparse
@@ -15,10 +13,7 @@ import os
 import warnings
 import numpy as np
 
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, classification_report
 
@@ -35,28 +30,55 @@ matplotlib.rcParams.update({
 plt.style.use("seaborn-v0_8-paper")
 
 from preprocess import load_and_preprocess
+from model_loader import load_models_from_config
 
 warnings.filterwarnings('ignore')
 
 
-def get_models():
-    return {
-        "Weighted KNN": KNeighborsClassifier(n_neighbors=3, weights='distance', metric='manhattan', n_jobs=-1),
-        "Random Forest": RandomForestClassifier(n_estimators=50, max_features='log2', random_state=42, n_jobs=-1),
-        "SVM": SVC(kernel='rbf', C=10, gamma='scale', random_state=42, probability=True),
-        "MLP": MLPClassifier(hidden_layer_sizes=(128, 64), alpha=1e-05, max_iter=500,
-                             early_stopping=True, random_state=42),
-    }
+DEFAULT_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'model_configs.json'
+)
+
+OUTPUT_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'assets', 'data_efficiency'
+)
+
+DATABASE_DIFAULT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    '..', '..', 'data', 'raw', 'wifi_scans.db'
+)
 
 
-def run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions):
+def get_models(config_path=DEFAULT_CONFIG_PATH):
+    """
+    Load model instances from model_configs.json via model_loader.
+
+    Args:
+        config_path: path to model_configs.json
+    """
+    models = load_models_from_config(config_path)
+    return {name: model for name, (model, _) in models.items()}
+
+
+def run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions, config_path=DEFAULT_CONFIG_PATH):
     """
     Train each model on different fractions of training data.
-    Returns dict of {model_name: {fraction: {accuracy, f1, report}}}
+
+    Args:
+        X_train, X_test, y_train, y_test: preprocessed data
+        label_encoder: fitted LabelEncoder for room labels
+        fractions: list of floats (e.g. [0.25, 0.5, 0.75, 1.0])
+        config_path: path to model_configs.json
+
+    Returns:
+        dict of {model_name: {fraction: {accuracy, f1, n_train, report}}}
     """
     results = {}
+    base_models = get_models(config_path)
 
-    for name, model in get_models().items():
+    for name, model in base_models.items():
         results[name] = {}
 
         for frac in fractions:
@@ -64,14 +86,14 @@ def run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions):
                 X_sub, _, y_sub, _ = train_test_split(
                     X_train, y_train,
                     train_size=frac,
-                    stratify=y_train if frac >= 0.1 else None,
+                    stratify=y_train if frac >= 0.1 else None, # avoid stratify for very small fractions to prevent errors
                     random_state=42
                 )
             else:
                 X_sub, y_sub = X_train, y_train
 
-            # Train
-            model_fresh = get_models()[name]  # fresh instance
+            # Clone gives a fresh unfitted copy with the same params
+            model_fresh = clone(model)
             model_fresh.fit(X_sub, y_sub)
 
             # Evaluate
@@ -94,15 +116,22 @@ def run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions):
     return results
 
 
-def plot_degradation_curves(results, fractions, output_dir):
-    """Plot accuracy vs data fraction for each model."""
+def plot_degradation_curves(results, fractions, output_dir=OUTPUT_DIR):
+    """
+    Plot accuracy vs data fraction for each model.
+
+    Args:
+        results: dict of {model_name: {fraction: {accuracy, f1, n_train, report}}}
+        fractions: list of data fractions used
+        output_dir: directory to save the plot
+    """
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
     colors = {
-        'Weighted KNN': '#3b82f6',
-        'Random Forest': '#10b981',
-        'SVM': '#f59e0b',
-        'MLP': '#ef4444',
+        'Weighted KNN': '#4C72B0',
+        'Random Forest': '#DD8452',
+        'SVM': '#55A868',
+        'MLP': '#C44E52',
     }
     markers = {
         'Weighted KNN': 'o',
@@ -114,14 +143,14 @@ def plot_degradation_curves(results, fractions, output_dir):
     for name in results:
         accs = [results[name][f]['accuracy'] for f in fractions]
         f1s = [results[name][f]['f1'] for f in fractions]
-        pcts = [f * 100 for f in fractions]
+        percentages = [f * 100 for f in fractions]
         sample_sizes = [results[name][f]['n_train'] for f in fractions]
 
-        labels = [f"{int(p)}%\n(n={n})" for p, n in zip(pcts, sample_sizes)]
+        labels = [f"{int(p)}%\n(n={n})" for p, n in zip(percentages, sample_sizes)]
 
-        ax1.plot(pcts, accs, marker=markers[name], color=colors[name],
+        ax1.plot(percentages, accs, marker=markers[name], color=colors[name],
                 label=name, linewidth=2, markersize=7)
-        ax2.plot(pcts, f1s, marker=markers[name], color=colors[name],
+        ax2.plot(percentages, f1s, marker=markers[name], color=colors[name],
                 label=name, linewidth=2, markersize=7)
 
     for ax, metric in [(ax1, 'Accuracy'), (ax2, 'F1 Score (weighted)')]:
@@ -130,7 +159,7 @@ def plot_degradation_curves(results, fractions, output_dir):
         ax.set_title(f'{metric} vs Training Data Size', fontweight='bold')
         ax.legend(fontsize=8)
         ax.grid(alpha=0.3)
-        ax.set_xticks(pcts)
+        ax.set_xticks(percentages)
         ax.set_xticklabels(labels)
         ax.set_ylim(max(0, ax.get_ylim()[0] - 0.05), 1.02)
 
@@ -142,8 +171,14 @@ def plot_degradation_curves(results, fractions, output_dir):
     print(f"\n[Plot] Saved data_efficiency_curves.pdf")
 
 
-def plot_bar_comparison(results, output_dir):
-    """Bar chart comparing 100% vs 50% for each model."""
+def plot_bar_comparison(results, output_dir=OUTPUT_DIR):
+    """
+    Bar chart comparing 100% vs 50% for each model.
+
+    Args:
+        results: dict of {model_name: {fraction: {accuracy, f1, n_train, report}}}
+        output_dir: directory to save the plot
+    """
     names = list(results.keys())
     full_f1 = [results[n][1.0]['f1'] for n in names]
     half_f1 = [results[n][0.5]['f1'] for n in names]
@@ -154,9 +189,9 @@ def plot_bar_comparison(results, output_dir):
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
 
-    bars1 = ax.bar(x - width, full_f1, width, label=r'100\% Data', color='#3b82f6', alpha=0.85)
-    bars2 = ax.bar(x, half_f1, width, label=r'50\% Data', color='#f59e0b', alpha=0.85)
-    bars3 = ax.bar(x + width, quarter_f1, width, label=r'25\% Data', color='#ef4444', alpha=0.85)
+    bars1 = ax.bar(x - width, full_f1, width, label=r'100\% Data', color='#4C72B0', alpha=0.85, hatch='///', edgecolor='black')
+    bars2 = ax.bar(x, half_f1, width, label=r'50\% Data', color='#C44E52', alpha=0.85, hatch='..', edgecolor='black')
+    bars3 = ax.bar(x + width, quarter_f1, width, label=r'25\% Data', color='#55A868', alpha=0.85, hatch='xxx', edgecolor='black')
 
     ax.set_ylabel('F1 Score (weighted)', fontsize=11)
     ax.set_title('Impact of Training Data Reduction on Model Performance', fontsize=13, fontweight='bold')
@@ -178,8 +213,15 @@ def plot_bar_comparison(results, output_dir):
     print(f"[Plot] Saved data_efficiency_bars.pdf")
 
 
-def plot_per_room_degradation(results, label_encoder, output_dir):
-    """Show per-room F1 at 100% vs 50% for each model."""
+def plot_per_room_degradation(results, label_encoder, output_dir=OUTPUT_DIR):
+    """
+    Show per-room F1 at 100% vs 50% for each model.
+
+    Args:
+        results: dict of {model_name: {fraction: {accuracy, f1, n_train, report}}}
+        label_encoder: fitted LabelEncoder to get room names
+        output_dir: directory to save the plot
+    """
     rooms = label_encoder.classes_
     names = list(results.keys())
 
@@ -193,8 +235,8 @@ def plot_per_room_degradation(results, label_encoder, output_dir):
         x = np.arange(len(rooms))
         width = 0.35
 
-        ax.bar(x - width/2, full_f1s, width, label=r'100\% Data', color='#3b82f6', alpha=0.8)
-        ax.bar(x + width/2, half_f1s, width, label=r'50\% Data', color='#f59e0b', alpha=0.8)
+        ax.bar(x - width/2, full_f1s, width, label=r'100\% Data', color='#4C72B0', alpha=0.8, hatch='..', edgecolor='black')
+        ax.bar(x + width/2, half_f1s, width, label=r'50\% Data', color='#C44E52', alpha=0.8, hatch='///', edgecolor='black')
 
         ax.set_ylabel('F1 Score')
         ax.set_title(name, fontweight='bold')
@@ -210,22 +252,29 @@ def plot_per_room_degradation(results, label_encoder, output_dir):
     plt.close()
     print(f"[Plot] Saved data_efficiency_per_room.pdf")
 
+def parse_args():
+    """
+    Parse command-line arguments for the data efficiency experiment.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db', type=str, default=DATABASE_DIFAULT_PATH)
+    parser.add_argument('--output', type=str, default=OUTPUT_DIR)
+    return parser.parse_args()
+    
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--db', type=str, default='../../data/raw/wifi_scans.db')
-    parser.add_argument('--output', type=str, default='../../models/')
-    args = parser.parse_args()
+    """
+    Main function to run the data efficiency experiment.    
+    """
+    
+    args = parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(script_dir, args.db) if not os.path.isabs(args.db) else args.db
     output_dir = os.path.join(script_dir, args.output) if not os.path.isabs(args.output) else args.output
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load data
     X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler = load_and_preprocess(db_path)
-
-    # Test fractions
     fractions = [0.10, 0.25, 0.50, 0.75, 1.0]
 
     print("\n" + "=" * 70)
@@ -236,7 +285,6 @@ def main():
 
     results = run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions)
 
-    # Summary table
     print("\n" + "=" * 70)
     print("  SUMMARY")
     print("=" * 70)

@@ -1,3 +1,18 @@
+"""
+predictor.py — Loads trained WiFi fingerprint models and predicts room from RSSI scans. Supports multiple models with runtime switching. Falls back to demo mode if no models are available.
+
+Usage:
+    1. Initialize predictor in app.py:
+    from predictor import Predictor
+    predictor = Predictor(models_dir="path/to/models")
+    2. Get predictions:
+    fingerprint = {"bssid1": -45, "bssid2": -80, ...}
+    result = predictor.predict(fingerprint)
+    result will be a dict with keys: room, confidence, model_used, position_x, position_y, aps_detected, mode
+    3. Switch active model at runtime:
+    predictor.set_active_model("Random Forest")  
+"""
+
 import joblib
 import numpy as np
 import json

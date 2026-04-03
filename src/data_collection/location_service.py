@@ -27,7 +27,12 @@ class LocationDelegate(Foundation.NSObject):
         return self
 
     def locationManagerDidChangeAuthorization_(self, manager):
-        """Called when authorization status changes (including after the user responds to the prompt)."""
+        """
+        Called when authorization status changes (including after the user responds to the prompt).
+
+        Args:
+            manager: The CLLocationManager instance that triggered the authorization change.
+        """
         status = manager.authorizationStatus()
 
         if status == CoreLocation.kCLAuthorizationStatusNotDetermined:
@@ -49,6 +54,14 @@ class LocationDelegate(Foundation.NSObject):
             Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
 
     def locationManager_didUpdateLocations_(self, manager, locations):
+        """
+        Called when new location data is available.
+
+        Args:
+            manager: The CLLocationManager instance that triggered the update.
+            locations: An array of CLLocation objects, with the most recent location last.
+        """
+        
         loc = locations[-1]
         coord = loc.coordinate()
         self.coordinates = [coord.latitude, coord.longitude]
@@ -58,18 +71,28 @@ class LocationDelegate(Foundation.NSObject):
         Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
 
     def locationManager_didFailWithError_(self, manager, error):
+        """
+        Called when there is an error retrieving location data.
+
+        Args:
+            manager: The CLLocationManager instance that triggered the error.
+            error: An NSError object describing the error that occurred.
+        """
+        
         self.coordinates = None
         self.error = error.localizedDescription()
         print(f"[Location] Error: {self.error}")
         manager.stopUpdatingLocation()
         Foundation.CFRunLoopStop(Foundation.CFRunLoopGetCurrent())
 
-
 def check_location_permission():
     """
     Check the current location authorization status.
 
-    Returns one of: 'granted', 'denied', 'not_determined'
+    Returns:
+        'granted' if permission is granted,
+        'not_determined' if the user has not yet been prompted,
+        'denied' if permission is denied.
     """
     manager = CoreLocation.CLLocationManager.alloc().init()
     status = manager.authorizationStatus()
@@ -90,8 +113,7 @@ def trigger_permission_prompt():
     Attempt to trigger the macOS location permission prompt.
 
     In a CLI context this may not show a dialog, but it registers Python
-    (or the terminal app) in System Settings > Location Services, which
-    is the important part — the user can then toggle it on manually.
+    (or the terminal app) in System Settings > Location Services, which the user can then toggle it on manually.
     """
     manager = CoreLocation.CLLocationManager.alloc().init()
     delegate = LocationDelegate.alloc().init()
@@ -134,7 +156,12 @@ def wait_for_location_permission(timeout=120, poll_interval=3):
 
 
 def retrieve_current_location():
-    """Fetch current GPS coordinates. Assumes permission has already been granted."""
+    """
+    Fetch current GPS coordinates. Assumes permission has already been granted.
+
+    Returns:
+        List of [latitude, longitude]
+    """
     manager = CoreLocation.CLLocationManager.alloc().init()
     delegate = LocationDelegate.alloc().init()
 
