@@ -1,6 +1,8 @@
-# TODO: review this file
 """
-location_service.py — Handles retrieval of GPS coordinates on macOS using CoreLocation. 
+location_service.py — Handles retrieval of GPS coordinates on macOS using CoreLocation.
+
+Using CoreLoaction enables macOS to provide location services permission prompts which are necessary for the 
+user to grant access to Wi-Fi scanning capabilities as well as to attach GPS coordinates to each Wi-Fi scan record in the database.
 
 Designed to be called by data_collector_service.py during Wi-Fi scans to attach location data to each scan record.
 
@@ -15,7 +17,17 @@ import objc
 import time
 
 class LocationDelegate(Foundation.NSObject):
+    """
+    Handles CoreLocation delegate methods to manage location permissions and retrieve GPS coordinates. 
+    This class is used by the location service functions to interact with the CoreLocation framework and respond to authorization changes, location updates, and errors.
+    """
+    
     def init(self):
+        """
+        Initialises the LocationDelegate instance, setting up properties to track coordinates, errors, and authorization status. 
+        This method is called when the delegate is created and prepares it to handle CoreLocation events.
+        """
+        
         self = objc.super(LocationDelegate, self).init()
         if self is None:
             return None
@@ -113,7 +125,7 @@ def trigger_permission_prompt():
     Attempt to trigger the macOS location permission prompt.
 
     In a CLI context this may not show a dialog, but it registers Python
-    (or the terminal app) in System Settings > Location Services, which the user can then toggle it on manually.
+    (or the terminal app) in System Settings > Privacy & Security > Location Services, which the user can then toggle it on manually.
     """
     manager = CoreLocation.CLLocationManager.alloc().init()
     delegate = LocationDelegate.alloc().init()
