@@ -13,6 +13,9 @@ import os
 import warnings
 import numpy as np
 
+from preprocess import load_and_preprocess
+from model_loader import load_models_from_config
+
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, classification_report
@@ -20,7 +23,6 @@ from sklearn.metrics import accuracy_score, f1_score, classification_report
 import matplotlib
 matplotlib.use('pdf')
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 matplotlib.rcParams.update({
     "text.usetex": True,
@@ -28,9 +30,6 @@ matplotlib.rcParams.update({
     "text.latex.preamble": r"\usepackage{amsmath}"
 })
 plt.style.use("seaborn-v0_8-paper")
-
-from preprocess import load_and_preprocess
-from model_loader import load_models_from_config
 
 warnings.filterwarnings('ignore')
 
@@ -307,12 +306,6 @@ def main():
     plot_degradation_curves(results, fractions, output_dir)
     plot_bar_comparison(results, output_dir)
     plot_per_room_degradation(results, label_encoder, output_dir)
-
-    print("\nDone! Check models/ for:")
-    print("  - data_efficiency_curves.pdf")
-    print("  - data_efficiency_bars.pdf")
-    print("  - data_efficiency_per_room.pdf")
-
 
 if __name__ == "__main__":
     main()
