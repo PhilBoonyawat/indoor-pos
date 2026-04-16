@@ -1,22 +1,43 @@
+"""
+scanner_thread.py — Handles scanning of Wi-Fi scans.
+
+Creates a background thread that periodically scans WiFi networks and runs position predictions. 
+Falls back to demo mode if scanning fails or user is outside the building or location where access points are not recognised.
+
+Usage:
+    from scanner_thread import ScannerThread
+    scanner = ScannerThread(predictor=my_predictor, interval=3, db_path="path/to/db")
+    scanner.start()
+"""
+
 import threading
 import time
 import subprocess
 import platform
-import re
 import sqlite3
-import json
 import os
 from datetime import datetime
 
 
 class ScannerThread:
     """
-    Background thread that periodically scans WiFi networks
+    Background thread that periodically scans Wi-Fi networks
     and runs position predictions.
-    Falls back to demo mode if scanning fails or user is outside the building.
+
+    Live Mode: Performs real Wi-Fi scans and uses the predictor to estimate position. 
+    Demo Mode: Uses pre-recorded scans from the database for demonstration when live scanning fails (e.g. permissions, outside building, access points not recognised).
     """
 
     def __init__(self, predictor, interval=3, db_path=None):
+        """
+        Initializes the ScannerThread with a predictor, scan interval, and optional database path for demo mode.
+
+        Args:
+            predictor: An instance of the Predictor class used to make position predictions from Wi-Fi scans.
+            interval: Time in seconds between each scan (default = 3).
+            db_path: Optional path to the SQLite database file for loading demo scans. If not provided, demo mode will not have real scans available.
+        """
+        
         self.predictor = predictor
         self.interval = interval
         self.db_path = db_path
@@ -41,35 +62,70 @@ class ScannerThread:
         self._last_fingerprint = None
 
     def start(self):
-        """Start the background scanning thread."""
+        """
+        Start the background scanning thread.
+        """
         self._running = True
         self._thread = threading.Thread(target=self._scan_loop, daemon=True)
         self._thread.start()
         print(f"[Scanner] Started scanning every {self.interval}s")
 
     def stop(self):
+        """
+        Stop the background scanning thread gracefully.
+        """
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
         print("[Scanner] Stopped")
 
     def is_running(self):
+        """
+        Check if the scanner thread is currently running.
+
+        Returns:
+            bool: True if the scanner is running, False otherwise.
+        """
         return self._running
 
     def get_scan_mode(self):
-        """Returns current scan mode."""
+        """
+        Returns current scan mode.
+
+        Returns:
+            str: "live" if using live Wi-Fi scans, "demo" if using pre
+        """
         return self._last_mode
 
     def get_current_position(self):
+        """
+        Get the latest predicted position in a thread-safe way.
+
+        Returns:
+            dict: A dictionary containing the latest position prediction, including room, confidence, model used,
+        """
+        
         with self._lock:
             return self._current_position.copy()
 
     def get_history(self, limit=20):
+        """
+        Get recent scan history for trail visualization in a thread-safe way.
+
+        Args:
+            limit: Maximum number of recent scans to return (default = 20)
+
+        Returns:         
+            list: A list of dictionaries containing recent position predictions, ordered from oldest to newest, limited to
+        """
+        
         with self._lock:
             return list(self._history[-limit:])
 
     def _scan_loop(self):
-        """Main scanning loop with smart fallback."""
+        """
+        Main scanning loop with smart fallback.
+        """
         while self._running:
             try:
                 fingerprint = None
@@ -124,7 +180,12 @@ class ScannerThread:
             time.sleep(self.interval)
 
     def _try_live_scan(self):
-        """Attempt a live WiFi scan. Returns fingerprint dict or None."""
+        """
+        Attempt a live WiFi scan. Returns fingerprint dict or None.
+
+        Returns:
+            dict or None: A dictionary mapping BSSID to RSSI if scan successful, or None
+        """
         system = platform.system()
         try:
             if system == "Darwin":
@@ -139,7 +200,12 @@ class ScannerThread:
             return None
 
     def _scan_macos(self):
-        """Scan WiFi on macOS using CoreWLAN framework (same as data collection)."""
+        """
+        Scan WiFi on macOS using CoreWLAN framework (same as data collection).
+
+        Returns:
+            dict or None: A dictionary mapping BSSID to RSSI if scan successful, or None if scan failed (e.g. permissions, busy)
+        """
         try:
             from CoreWLAN import CWWiFiClient
 
@@ -171,55 +237,10 @@ class ScannerThread:
             print("[Scanner] CoreWLAN not available — install pyobjc-framework-CoreWLAN")
             return None
 
-    def _scan_linux(self):
-        """Scan WiFi on Linux using nmcli."""
-        result = subprocess.run(
-            ["nmcli", "-t", "-f", "BSSID,SIGNAL", "dev", "wifi", "list", "--rescan", "yes"],
-            capture_output=True, text=True, timeout=10
-        )
-
-        fingerprint = {}
-        for line in result.stdout.strip().split("\n"):
-            if ":" in line:
-                parts = line.rsplit(":", 1)
-                if len(parts) == 2:
-                    bssid = parts[0].strip().lower()
-                    try:
-                        signal_pct = int(parts[1].strip())
-                        rssi = int(signal_pct / 2 - 100)
-                        fingerprint[bssid] = rssi
-                    except ValueError:
-                        continue
-
-        return fingerprint if fingerprint else None
-
-    def _scan_windows(self):
-        """Scan WiFi on Windows using netsh."""
-        result = subprocess.run(
-            ["netsh", "wlan", "show", "networks", "mode=bssid"],
-            capture_output=True, text=True, timeout=10
-        )
-
-        fingerprint = {}
-        current_bssid = None
-
-        for line in result.stdout.split("\n"):
-            line = line.strip()
-            if line.startswith("BSSID"):
-                current_bssid = line.split(":", 1)[1].strip().lower()
-            elif "Signal" in line and current_bssid:
-                try:
-                    signal_pct = int(line.split(":")[1].strip().replace("%", ""))
-                    rssi = int(signal_pct / 2 - 100)
-                    fingerprint[current_bssid] = rssi
-                    current_bssid = None
-                except ValueError:
-                    continue
-
-        return fingerprint if fingerprint else None
-
     def _load_demo_scans(self):
-        """Load real scans from database for realistic demo playback."""
+        """
+        Load real scans from database for realistic demo playback.
+        """
         if not self.db_path or not os.path.exists(self.db_path):
             print("[Scanner] No database found for demo mode — using random predictions")
             return
@@ -249,7 +270,12 @@ class ScannerThread:
             print(f"[Scanner] Failed to load demo scans: {e}")
 
     def _get_demo_fingerprint(self):
-        """Return next demo scan in rotation."""
+        """
+        Return next demo scan in rotation.
+        
+        Returns:
+            dict or None: A dictionary mapping BSSID to RSSI for the next demo scan, or None if no demo scans available.
+        """
         if not self._demo_scans:
             return {}
 
