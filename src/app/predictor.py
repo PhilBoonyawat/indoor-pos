@@ -19,6 +19,7 @@ import json
 import os
 import random
 
+MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'models')
 
 class Predictor:
     """
@@ -27,12 +28,19 @@ class Predictor:
     Falls back to demo mode if no models are available.
     """
 
-    def __init__(self, models_dir=None):
+    def __init__(self, models_dir=MODELS_DIR):
+        """
+        Initialize the Predictor by loading models and metadata from the specified directory.
+
+        Args:
+            models_dir: Directory containing trained .pkl models and metadata files (label_encoder.pkl, scaler.pkl, feature_names.json, room_positions.json). 
+                        If None or not found, runs in demo mode.
+        """
         self.models = {}           # name → trained model
         self.active_model = None   # currently selected model name
         self.label_encoder = None  # decodes predictions to room names
         self.scaler = None         # normalises RSSI values
-        self.feature_names = []    # ordered list of 194 BSSIDs
+        self.feature_names = []    # ordered list of BSSIDs
         self.room_positions = {}   # room name → {x, y} on floor plan
         self.models_dir = models_dir
 
@@ -40,7 +48,12 @@ class Predictor:
             self._load_all(models_dir)
 
     def _load_all(self, models_dir):
-        """Load all models and metadata from the models directory."""
+        """
+        Load all models and metadata from the models directory.
+
+        Args:
+            models_dir: Directory containing trained .pkl models and metadata files.
+        """
 
         # Load metadata first
         le_path = os.path.join(models_dir, 'label_encoder.pkl')
@@ -95,11 +108,25 @@ class Predictor:
             print("[Predictor] No models loaded — running in demo mode")
 
     def get_available_models(self):
-        """Return list of loaded model names."""
+        """
+        Return list of loaded model names.
+
+        Returns:
+            List of model names available for prediction.
+        """
         return list(self.models.keys())
 
     def set_active_model(self, model_name):
-        """Switch the active model."""
+        """
+        Switch the active model.
+        
+        Args:            
+            model_name: Name of the model to activate (must be in loaded models)
+
+        Returns:
+            bool: True if model switched successfully, False if model_name not found
+
+        """
         if model_name in self.models:
             self.active_model = model_name
             print(f"[Predictor] Switched to {model_name}")
@@ -122,7 +149,12 @@ class Predictor:
             return self._demo_predict()
 
     def _model_predict(self, fingerprint):
-        """Run prediction using the active trained model."""
+        """
+        Run prediction using the active trained model.
+
+        Args:
+            fingerprint: dict of {bssid: rssi} values from a WiFi scan
+        """
         import pandas as pd
         model = self.models[self.active_model]
 
@@ -167,7 +199,9 @@ class Predictor:
         }
 
     def _demo_predict(self):
-        """Demo mode — returns simulated predictions for testing the UI."""
+        """
+        Demo mode — returns simulated predictions for testing the UI.
+        """
         rooms = ["(S) 7.01", "(S) 7.02", "(S) 7.03", "(S) 7.04", "(S) 7.05", "(S) 7.06"]
         room = random.choice(rooms)
         position = self.room_positions.get(room, {"x": 0, "y": 0})
@@ -186,6 +220,12 @@ class Predictor:
         """
         Convert a {bssid: rssi} dict to the fixed-length feature vector
         the model expects. Missing APs get -100.
+
+        Args:
+            fingerprint: dict of {bssid: rssi} values from a WiFi scan
+        
+        Returns:
+            np.array of RSSI values ordered according to self.feature_names
         """
         vector = []
         for ap in self.feature_names:
