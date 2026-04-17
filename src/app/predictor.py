@@ -19,6 +19,8 @@ import json
 import os
 import random
 
+import pandas as pd
+
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'models')
 
 class Predictor:
@@ -36,12 +38,12 @@ class Predictor:
             models_dir: Directory containing trained .pkl models and metadata files (label_encoder.pkl, scaler.pkl, feature_names.json, room_positions.json). 
                         If None or not found, runs in demo mode.
         """
-        self.models = {}           # name → trained model
+        self.models = {}           # name -> trained model
         self.active_model = None   # currently selected model name
         self.label_encoder = None  # decodes predictions to room names
         self.scaler = None         # normalises RSSI values
         self.feature_names = []    # ordered list of BSSIDs
-        self.room_positions = {}   # room name → {x, y} on floor plan
+        self.room_positions = {}   # room name -> {x, y} on floor plan
         self.models_dir = models_dir
 
         if models_dir and os.path.exists(models_dir):
@@ -63,8 +65,8 @@ class Predictor:
 
         if os.path.exists(le_path):
             self.label_encoder = joblib.load(le_path)
-            print(f"[Predictor] Label encoder loaded — rooms: {list(self.label_encoder.classes_)}")
-
+            print(f"[Predictor] Label encoder loaded with classes: {self.label_encoder.classes_}")
+            
         if os.path.exists(scaler_path):
             self.scaler = joblib.load(scaler_path)
             print(f"[Predictor] Scaler loaded")
@@ -98,7 +100,7 @@ class Predictor:
 
         # Set default active model
         if self.models:
-            # Prefer Random Forest as default
+            # Random Forest
             if 'Random Forest' in self.models:
                 self.active_model = 'Random Forest'
             else:
@@ -155,7 +157,6 @@ class Predictor:
         Args:
             fingerprint: dict of {bssid: rssi} values from a WiFi scan
         """
-        import pandas as pd
         model = self.models[self.active_model]
 
         # 1. Convert fingerprint to feature vector

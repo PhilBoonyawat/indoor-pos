@@ -13,11 +13,13 @@ Usage:
 import threading
 import time
 import subprocess
+from CoreWLAN import CWWiFiClient
 import platform
 import sqlite3
 import os
 from datetime import datetime
 
+DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'raw', 'wifi_scans.db')
 
 class ScannerThread:
     """
@@ -28,7 +30,7 @@ class ScannerThread:
     Demo Mode: Uses pre-recorded scans from the database for demonstration when live scanning fails (e.g. permissions, outside building, access points not recognised).
     """
 
-    def __init__(self, predictor, interval=3, db_path=None):
+    def __init__(self, predictor, interval=3, db_path=DB_PATH):
         """
         Initializes the ScannerThread with a predictor, scan interval, and optional database path for demo mode.
 
@@ -93,7 +95,7 @@ class ScannerThread:
         Returns current scan mode.
 
         Returns:
-            str: "live" if using live Wi-Fi scans, "demo" if using pre
+            str: "live" if using live Wi-Fi scans, "demo" if using pre-recorded demo scans, or "initialising" if not yet determined.
         """
         return self._last_mode
 
@@ -102,7 +104,8 @@ class ScannerThread:
         Get the latest predicted position in a thread-safe way.
 
         Returns:
-            dict: A dictionary containing the latest position prediction, including room, confidence, model used,
+            dict: A dictionary containing the latest position prediction, including room, confidence, 
+                  model used, coordinates, number of APs detected, mode, and timestamp.
         """
         
         with self._lock:
@@ -116,7 +119,8 @@ class ScannerThread:
             limit: Maximum number of recent scans to return (default = 20)
 
         Returns:         
-            list: A list of dictionaries containing recent position predictions, ordered from oldest to newest, limited to
+            list: A list of dictionaries containing recent position predictions, ordered from oldest to newest, limited to the specified number. 
+                  Each dictionary includes room, confidence, model used, coordinates, number of APs detected, mode, and timestamp.
         """
         
         with self._lock:
@@ -129,31 +133,29 @@ class ScannerThread:
         while self._running:
             try:
                 fingerprint = None
-                mode = self._last_mode  # persist mode from last successful scan
+                mode = self._last_mode 
 
-                # 1. Try live WiFi scan
                 live_scan = self._try_live_scan()
 
                 if live_scan is not None:
-                    # 2. Check if we're in the building (do we see known APs?)
                     known_aps = sum(1 for ap in live_scan if ap in self.predictor.feature_names)
 
                     if known_aps >= 3:
-                        # We're in the building — use live scan
+                        # Use live scan since we have enough known APs for a reliable prediction
                         fingerprint = live_scan
                         mode = "live"
                         self._last_mode = "live"
                         self._last_fingerprint = live_scan
                         print(f"[Scanner] Live scan — {len(live_scan)} APs total, {known_aps} known")
                     else:
-                        print(f"[Scanner] Outside building — {len(live_scan)} APs found, only {known_aps} known.")
+                        print(f"[Scanner] Outside known area — {len(live_scan)} APs found, only {known_aps} known.")
                 else:
                     # Scan failed (busy/permissions) — reuse last live scan if available
                     if self._last_fingerprint is not None and self._last_mode == "live":
                         fingerprint = self._last_fingerprint
                         mode = "live"
 
-                # 3. Fall back to demo only if we have no usable scan at all
+                # Fall back to demo only if we have no usable scan at all
                 if fingerprint is None:
                     if not self._demo_loaded:
                         self._load_demo_scans()
@@ -162,7 +164,6 @@ class ScannerThread:
                     mode = "demo"
                     self._last_mode = "demo"
 
-                # 4. Run prediction
                 if fingerprint is not None:
                     prediction = self.predictor.predict(fingerprint)
                     prediction["mode"] = mode
@@ -177,6 +178,7 @@ class ScannerThread:
             except Exception as e:
                 print(f"[Scanner] Error: {e}")
 
+            # Wait for the specified interval before the next scan
             time.sleep(self.interval)
 
     def _try_live_scan(self):
@@ -190,10 +192,6 @@ class ScannerThread:
         try:
             if system == "Darwin":
                 return self._scan_macos()
-            elif system == "Linux":
-                return self._scan_linux()
-            elif system == "Windows":
-                return self._scan_windows()
             else:
                 return None
         except Exception as e:
@@ -201,41 +199,34 @@ class ScannerThread:
 
     def _scan_macos(self):
         """
-        Scan WiFi on macOS using CoreWLAN framework (same as data collection).
+        Scan Wi-Fi on macOS using CoreWLAN framework (same as data collection).
 
         Returns:
             dict or None: A dictionary mapping BSSID to RSSI if scan successful, or None if scan failed (e.g. permissions, busy)
         """
-        try:
-            from CoreWLAN import CWWiFiClient
+        
+        client = CWWiFiClient.sharedWiFiClient()
+        wifi_iface = client.interface()
+        scans, scan_err = wifi_iface.scanForNetworksWithName_error_(None, None)
 
-            client = CWWiFiClient.sharedWiFiClient()
-            wifi_iface = client.interface()
-            scans, scan_err = wifi_iface.scanForNetworksWithName_error_(None, None)
-
-            if scan_err:
-                # "Resource busy" is common when scanning too fast
-                # Use the last successful scan instead of failing
-                if "Resource busy" in str(scan_err) and hasattr(self, '_last_live_scan'):
-                    print("[Scanner] Resource busy — using cached scan")
-                    return self._last_live_scan
-                print(f"[Scanner] CoreWLAN error: {scan_err}")
-                return None
-
-            fingerprint = {}
-            for scan in scans:
-                bssid = scan.bssid()
-                if bssid and bssid not in fingerprint:
-                    fingerprint[bssid.lower()] = scan.rssiValue()
-
-            if fingerprint:
-                self._last_live_scan = fingerprint  # cache for busy errors
-
-            return fingerprint if fingerprint else None
-
-        except ImportError:
-            print("[Scanner] CoreWLAN not available — install pyobjc-framework-CoreWLAN")
+        if scan_err:
+            # Use the last successful scan instead of failing
+            if "Resource busy" in str(scan_err) and hasattr(self, '_last_live_scan'):
+                print("[Scanner] Resource busy — using cached scan")
+                return self._last_live_scan
+            print(f"[Scanner] CoreWLAN error: {scan_err}")
             return None
+
+        fingerprint = {}
+        for scan in scans:
+            bssid = scan.bssid()
+            if bssid and bssid not in fingerprint:
+                fingerprint[bssid.lower()] = scan.rssiValue()
+
+        if fingerprint:
+            self._last_live_scan = fingerprint  # cache for busy errors
+
+        return fingerprint if fingerprint else None
 
     def _load_demo_scans(self):
         """
