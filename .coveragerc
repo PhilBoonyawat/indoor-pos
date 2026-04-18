@@ -1,0 +1,6 @@
+; Coverage configuration file
+; DO NOT CHANGE THIS FILE!
+
+[run]
+branch = True
+omit = *__init__.py,*test*
