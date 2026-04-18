@@ -1,0 +1,30 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "src/data_collection/location_service.py",
+    "src/training/data_efficiency_analysis.py",
+    "src/training/hyperparameter_tuning.py",
+    "*/test_*",
+]
+
+filterwarnings = [
+    "ignore::sklearn.exceptions.FitFailedWarning"
+]
+
+[tool.coverage.report]
+show_missing = true
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__",
+    "def main",
+    "raise NotImplementedError",
+]

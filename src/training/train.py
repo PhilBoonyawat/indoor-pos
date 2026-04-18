@@ -128,16 +128,16 @@ def train_and_evaluate(models, X_train, X_test, y_train, y_test, label_encoder, 
 
         # Metrics
         test_acc = accuracy_score(y_test, y_pred)
-        test_f1 = f1_score(y_test, y_pred, average='weighted')
+        test_f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
         cm = confusion_matrix(y_test, y_pred)
         report = classification_report(
             y_test, y_pred, digits=4,
             target_names=label_encoder.classes_,
-            output_dict=True
+            output_dict=True, zero_division=0
         )
         report_str = classification_report(
             y_test, y_pred, digits=4,
-            target_names=label_encoder.classes_
+            target_names=label_encoder.classes_, zero_division=0
         )
 
         print(f"  Test Accuracy: {test_acc:.4f}")
@@ -268,7 +268,7 @@ def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
     # ── 4. Cross-Validation Box Plot ─────────────
     fig, ax = plt.subplots(figsize=(6, 4))
     cv_data = [results[n]['cv_scores'] for n in model_names]
-    bp = ax.boxplot(cv_data, labels=model_names, patch_artist=True)
+    bp = ax.boxplot(cv_data, tick_labels=model_names, patch_artist=True)
 
     colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
     for patch, color in zip(bp['boxes'], colors[:len(model_names)]):
@@ -372,13 +372,13 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
         y_pred = fresh_model.predict(X_test)
 
         test_acc = accuracy_score(y_test, y_pred)
-        test_f1 = f1_score(y_test, y_pred, average='weighted')
+        test_f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
         cm = confusion_matrix(y_test, y_pred)
 
         report_str = classification_report(
             y_test, y_pred,
             target_names=label_encoder.classes_
-            , digits=4
+            , digits=4, zero_division=0
         )
 
         print(f"\n  {name}")

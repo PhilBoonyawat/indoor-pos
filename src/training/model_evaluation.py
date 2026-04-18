@@ -149,7 +149,7 @@ def evaluate_models(models, X_test, y_test, label_encoder):
         report_str = classification_report(
             y_test, y_pred,
             target_names=label_encoder.classes_,
-            digits=4
+            digits=4, zero_division=0
         )
 
         print(f"\n  {name} — Accuracy: {acc:.4f}")

@@ -98,10 +98,10 @@ def run_experiment(X_train, X_test, y_train, y_test, label_encoder, fractions, c
             # Evaluate
             y_pred = model_fresh.predict(X_test)
             acc = accuracy_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred, average='weighted')
+            f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
             report = classification_report(y_test, y_pred,
                                            target_names=label_encoder.classes_,
-                                           digits=4, output_dict=True)
+                                           digits=4, output_dict=True, zero_division=0)
 
             results[name][frac] = {
                 'accuracy': acc,
