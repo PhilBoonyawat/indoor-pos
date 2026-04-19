@@ -4,6 +4,10 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::sklearn.exceptions.FitFailedWarning",
+    "ignore:Tight layout not applied.*:UserWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
@@ -13,10 +17,6 @@ omit = [
     "src/training/data_efficiency_analysis.py",
     "src/training/hyperparameter_tuning.py",
     "*/test_*",
-]
-
-filterwarnings = [
-    "ignore::sklearn.exceptions.FitFailedWarning"
 ]
 
 [tool.coverage.report]

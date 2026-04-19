@@ -3,7 +3,7 @@ Shared test fixtures for the Indoor Position Tracker test suite.
 
 Organisation:
 - Constants at the top: TEST_ROOMS, TEST_BSSIDS, SCANS_PER_ROOM
-- Factory fixtures: make_scan_data (callable — tests pass args)
+- Factory fixtures: make_scan_data 
 - Data fixtures: test_db, empty_db, sample_fingerprint
 - File/dir fixtures: trained_models_dir, model_config
 """
@@ -20,6 +20,8 @@ import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
+from src.training.preprocess import load_and_preprocess
+
 
 # ── Shared constants ────────────────────────────────────────────────
 
@@ -28,16 +30,25 @@ TEST_BSSIDS = [f"aa:bb:cc:dd:ee:{i:02x}" for i in range(10)]
 SCANS_PER_ROOM = 40
 
 
-# ── Factory fixtures — return callables for flexible data creation ──
+# ── Factory fixtures ────────────────────────────────────────────────
 
 @pytest.fixture
 def make_scan_data():
     """
     Factory fixture: returns a function that builds scan_data lists.
     Tests can call it with different args instead of hardcoding data.
+
+    Returns:
+        Function that creates scan_data lists with specified parameters.
     """
     def _make(n_aps=5, location="(S) 7.01", orientation="N",
               timestamp="2024-01-01T10:00:00"):
+        """
+        Returns:
+            List of dicts representing WiFi scan results, with specified
+            number of APs and metadata.
+        """
+        
         return [
             {
                 "ssid": f"Network-{i}",
@@ -59,7 +70,13 @@ def make_scan_data():
 # ── Database fixtures ──────────────────────────────────────────────
 
 def _create_schema(conn):
-    """Create all WiFi scan tables. Shared between test_db and empty_db."""
+    """
+    Create all WiFi scan tables. Shared between test_db and empty_db.
+
+    Args:
+        conn: A sqlite3.Connection object connected to the database where
+              the schema should be created.
+    """
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE scan_metadata (
@@ -92,8 +109,14 @@ def _create_schema(conn):
 @pytest.fixture
 def test_db(tmp_path):
     """
-    SQLite database populated with 60 scans (20 per room, 3 rooms).
+    SQLite database populated with 160 scans (40 per room, 4 rooms).
     Each room has a distinct RSSI signature so ML models can learn it.
+
+    Args:
+        tmp_path: pytest fixture that provides a temporary directory unique to the test invocation.
+    
+    Returns:
+        Path to the populated SQLite database file.
     """
     db_path = str(tmp_path / "wifi_scans.db")
     conn = sqlite3.connect(db_path)
@@ -108,7 +131,7 @@ def test_db(tmp_path):
         )
 
     rng = np.random.RandomState(42)
-    base_time = datetime(2024, 1, 1, 10, 0, 0)
+    base_time = datetime(2025, 1, 1, 10, 0, 0)
 
     for room_idx, room in enumerate(TEST_ROOMS):
         for scan_num in range(SCANS_PER_ROOM):
@@ -121,7 +144,7 @@ def test_db(tmp_path):
                 INSERT INTO scan_metadata
                 (scan_id, timestamp, location, latitude, longitude, orientation)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (scan_id, ts, room, 51.511, -0.116, "N"))
+            """, (scan_id, ts, room, 51.511, -0.116, "196 N"))
 
             for ap_idx, bssid in enumerate(TEST_BSSIDS):
                 base_rssi = -80 + (room_idx * 5) + (ap_idx * (room_idx - 1))
@@ -139,7 +162,15 @@ def test_db(tmp_path):
 
 @pytest.fixture
 def empty_db(tmp_path):
-    """Empty database with schema only, no rows."""
+    """
+    Empty database with schema only, no rows.
+
+    Args:
+        tmp_path: pytest fixture that provides a temporary directory unique to the test invocation.
+
+    Returns:
+        Path to the empty SQLite database file.
+    """
     db_path = str(tmp_path / "empty.db")
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -153,20 +184,26 @@ def empty_db(tmp_path):
 
 @pytest.fixture
 def trained_models_dir(tmp_path, test_db):
-    """Directory containing two trained models plus all metadata files."""
-    from src.training.preprocess import load_and_preprocess
+    """
+    Directory containing two trained models plus all metadata files.
 
+    Args:
+        tmp_path: pytest fixture that provides a temporary directory unique to the test invocation.
+        test_db: Path to the populated SQLite database file, used to train the models.
+
+    Returns:
+        Path to the directory containing the trained model files and metadata.
+    """
     models_dir = str(tmp_path / "models")
     os.makedirs(models_dir)
 
-    X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler = \
-        load_and_preprocess(test_db)
+    X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler = load_and_preprocess(test_db)
 
-    knn = KNeighborsClassifier(n_neighbors=3, weights="distance")
+    knn = KNeighborsClassifier(n_neighbors=3, weights="distance", metric="manhattan", n_jobs=-1)
     knn.fit(X_train, y_train)
     joblib.dump(knn, os.path.join(models_dir, "weighted_knn.pkl"))
 
-    rf = RandomForestClassifier(n_estimators=10, random_state=42)
+    rf = RandomForestClassifier(n_estimators=50, random_state=42, max_features="log2", n_jobs=-1, max_depth=null, min_samples_leaf=1, min_samples_split=5)
     rf.fit(X_train, y_train)
     joblib.dump(rf, os.path.join(models_dir, "random_forest.pkl"))
 
@@ -188,7 +225,15 @@ def trained_models_dir(tmp_path, test_db):
 
 @pytest.fixture
 def model_config(tmp_path):
-    """A model_configs.json file with fast-training hyperparameters."""
+    """
+    A sample model_configs.json file with fast-training hyperparameters.
+
+    Args:
+        tmp_path: pytest fixture that provides a temporary directory unique to the test invocation.
+
+    Returns:
+        Path to the created model_configs.json file.
+    """
     config = {
         "Weighted KNN": {
             "model": "KNeighborsClassifier",
@@ -239,5 +284,10 @@ def model_config(tmp_path):
 
 @pytest.fixture
 def sample_fingerprint():
-    """A realistic WiFi fingerprint — one RSSI reading per known AP."""
+    """
+    A realistic WiFi fingerprint — one RSSI reading per known AP.
+
+    Returns:
+        A dict mapping BSSID to RSSI, simulating a live scan with all known AP
+    """
     return {bssid: -60 + i * 3 for i, bssid in enumerate(TEST_BSSIDS)}
