@@ -7,6 +7,7 @@ Usage:
 """
 
 import sqlite3
+from contextlib import closing
 import os
 import numpy as np
 import pandas as pd
@@ -33,21 +34,19 @@ def load_fingerprints_from_db(db_path=DEFAULT_DB_PATH):
         fingerprints: DataFrame with BSSIDs as columns, scans as rows
         labels: Series of room labels for each scan
     """
-    conn = sqlite3.connect(db_path)
-
-    # Get all scan data joined with metadata
-    query = """
-        SELECT 
-            sm.scan_id,
-            sm.location,
-            ws.bssid,
-            ws.rssi
-        FROM scan_metadata sm
-        JOIN wifi_scan ws ON sm.scan_id = ws.scan_id
-        WHERE sm.location IS NOT NULL AND sm.location != ''
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    with closing(sqlite3.connect(db_path)) as conn:
+        # Get all scan data joined with metadata
+        query = """
+            SELECT 
+                sm.scan_id,
+                sm.location,
+                ws.bssid,
+                ws.rssi
+            FROM scan_metadata sm
+            JOIN wifi_scan ws ON sm.scan_id = ws.scan_id
+            WHERE sm.location IS NOT NULL AND sm.location != ''
+        """
+        df = pd.read_sql_query(query, conn)
 
     if df.empty:
         raise ValueError("No data found in database. Check your table names and data.")
@@ -207,23 +206,21 @@ def load_and_preprocess_temporal(db_path=DEFAULT_DB_PATH, test_ratio=0.2, min_de
     print("  Preprocessing Pipeline (TEMPORAL SPLIT)")
     print("=" * 50)
 
-    conn = sqlite3.connect(db_path)
-
-    # Get scan data WITH timestamp for ordering
-    query = """
-        SELECT 
-            sm.scan_id,
-            sm.location,
-            sm.timestamp,
-            ws.bssid,
-            ws.rssi
-        FROM scan_metadata sm
-        JOIN wifi_scan ws ON sm.scan_id = ws.scan_id
-        WHERE sm.location IS NOT NULL AND sm.location != ''
-        ORDER BY sm.timestamp
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    with closing(sqlite3.connect(db_path)) as conn:
+        # Get scan data WITH timestamp for ordering
+        query = """
+            SELECT 
+                sm.scan_id,
+                sm.location,
+                sm.timestamp,
+                ws.bssid,
+                ws.rssi
+            FROM scan_metadata sm
+            JOIN wifi_scan ws ON sm.scan_id = ws.scan_id
+            WHERE sm.location IS NOT NULL AND sm.location != ''
+            ORDER BY sm.timestamp
+        """
+        df = pd.read_sql_query(query, conn)
 
     print(f"[Temporal] Loaded {len(df)} RSSI readings")
 

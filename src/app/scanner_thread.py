@@ -12,10 +12,10 @@ Usage:
 
 import threading
 import time
-import subprocess
 from CoreWLAN import CWWiFiClient
 import platform
 import sqlite3
+from contextlib import closing
 import os
 from datetime import datetime
 
@@ -237,24 +237,23 @@ class ScannerThread:
             return
 
         try:
-            conn = sqlite3.connect(self.db_path)
+            with closing(sqlite3.connect(self.db_path)) as conn:
 
-            # Get one scan per room for demo rotation
-            scan_ids = conn.execute("""
-                SELECT scan_id, location FROM scan_metadata
-                GROUP BY location
-                ORDER BY location
-            """).fetchall()
+                # Get one scan per room for demo rotation
+                scan_ids = conn.execute("""
+                    SELECT scan_id, location FROM scan_metadata
+                    GROUP BY location
+                    ORDER BY location
+                """).fetchall()
 
-            for scan_id, location in scan_ids:
-                rows = conn.execute("""
-                    SELECT bssid, rssi FROM wifi_scan WHERE scan_id = ?
-                """, (scan_id,)).fetchall()
+                for scan_id, location in scan_ids:
+                    rows = conn.execute("""
+                        SELECT bssid, rssi FROM wifi_scan WHERE scan_id = ?
+                    """, (scan_id,)).fetchall()
 
-                fingerprint = {bssid: rssi for bssid, rssi in rows}
-                self._demo_scans.append(fingerprint)
+                    fingerprint = {bssid: rssi for bssid, rssi in rows}
+                    self._demo_scans.append(fingerprint)
 
-            conn.close()
             print(f"[Scanner] Loaded {len(self._demo_scans)} demo scans from database")
 
         except Exception as e:

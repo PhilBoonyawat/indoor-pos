@@ -1,5 +1,4 @@
 """Tests for src/app/predictor.py"""
-#TODO
 import os
 
 import joblib

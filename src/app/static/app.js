@@ -1,40 +1,33 @@
-// ============================================================
-// CONFIG
-// ============================================================
+/*
+app.js - Frontend logic for indoor positioning system
+*/
+
 const CONFIG = {
     floorPlanUrl: "/static/Level7Floor.svg",
     pollInterval: 3000,
 };
 
-// ============================================================
-// GLOBALS
-// ============================================================
 let map;
 let positionMarker;
 let roomPositions = {};
 let bounds;
 
-// SVG natural dimensions — must match the actual SVG viewBox
+// SVG natural dimensions matching the actual image file
 const SVG_W = 1626.667;
 const SVG_H = 708;
 
-// ============================================================
-// COORDINATE HELPER
-// SVG has y=0 at top-left. Leaflet CRS.Simple has y=0 at
-// bottom-left. So: leaflet_lat = SVG_H - svg_y
-//                  leaflet_lng = svg_x
-// ============================================================
 function svgToLatLng(svgX, svgY) {
     return [SVG_H - svgY, svgX];
 }
 
-// ============================================================
-// INIT MAP
-// ============================================================
+/*
+Initialize Leaflet map with the floor plan as a static image overlay.
+The SVG's coordinate system has (0,0) at the top-left, so we flip the Y-axis
+when converting to Leaflet's lat/lng format.
+*/
 function initMap() {
     bounds = [[0, 0], [SVG_H, SVG_W]];
 
-    // Start with a very low minZoom; we will tighten it after fitBounds
     map = L.map("map", {
         crs: L.CRS.Simple,
         minZoom: -5,
@@ -59,7 +52,6 @@ function initMap() {
     loadRoomPositions();
     loadModels();
 
-    // Wire up control buttons
     document.getElementById("btn-center").addEventListener("click", () => {
         if (positionMarker) map.panTo(positionMarker.getLatLng());
     });
@@ -67,15 +59,15 @@ function initMap() {
     document.getElementById("btn-clear").addEventListener("click", clearTrail);
 
     setInterval(fetchPosition, CONFIG.pollInterval);
-    fetchPosition(); // immediate first fetch
+    fetchPosition(); 
 }
 
-// Start immediately — SVG dimensions are already known
 initMap();
 
-// ============================================================
-// MARKER (BLUE DOT)
-// ============================================================
+/*
+Position marker with a pulsing effect, created using a custom divIcon.
+The marker starts at the center of the floor plan and updates based on API data.
+*/
 function initMarker() {
     const positionIcon = L.divIcon({
         className: "",
@@ -97,9 +89,12 @@ function initMarker() {
     positionMarker.bindPopup("Waiting for position...");
 }
 
-// ============================================================
-// ROOM LABELS — placed directly on the floor plan
-// ============================================================
+/*
+Load room positions from the backend and place markers with labels on the map.
+The API returns an object mapping room names to their SVG coordinates.
+For each room, we place a small teal circle and a permanent label that stays
+visible at all zoom levels.
+*/
 async function loadRoomPositions() {
     try {
         const res = await fetch("/api/room-positions");
@@ -124,7 +119,7 @@ async function loadRoomPositions() {
                 icon: L.divIcon({
                     className: "room-label-icon",
                     html: `<span class="room-tooltip">${room}</span>`,
-                    iconAnchor: [0, 22],   // place label just above the dot
+                    iconAnchor: [0, 22],  
                 }),
                 interactive: false,
                 zIndexOffset: 0,
@@ -136,9 +131,7 @@ async function loadRoomPositions() {
     }
 }
 
-// ============================================================
-// TRAIL
-// ============================================================
+
 let trailPoints = [];
 let trailVisible = true;
 const trailLine = L.polyline([], {
@@ -148,27 +141,37 @@ const trailLine = L.polyline([], {
     dashArray: "5, 8",
 }).addTo(map);
 
+/*
+Trail management: keeps a history of recent positions and displays them as a dashed line.
+*/
 function addTrailPoint(latlng) {
     trailPoints.push(latlng);
     if (trailPoints.length > 50) trailPoints.shift();
     if (trailVisible) trailLine.setLatLngs(trailPoints);
 }
 
+/*
+Toggle the visibility of the trail line without losing the history of points.
+*/
 function toggleTrail() {
     trailVisible = !trailVisible;
     trailLine.setLatLngs(trailVisible ? trailPoints : []);
 }
 
+/*
+Clear the trail history and remove the line from the map.
+*/
 function clearTrail() {
     trailPoints = [];
     trailLine.setLatLngs([]);
 }
 
-// ============================================================
-// MODEL SELECTION
-// ============================================================
+
 const modelSelect = document.getElementById("model-select");
 
+/*
+Load available models from the backend and populate the dropdown menu.
+*/
 async function loadModels() {
     try {
         const res = await fetch("/api/models");
@@ -195,18 +198,19 @@ modelSelect.addEventListener("change", async () => {
     });
 });
 
-// ============================================================
-// FETCH POSITION — move marker to predicted room
-// ============================================================
+
 let lastRoom = null;
 
+/*
+Fetch the current position from the backend API and update the marker, popup, and UI labels.
+The API response includes room name, confidence, model used, timestamp, and mode (live/demo).
+If the room has changed since the last update, we trigger a flash effect on the marker.
+*/
 async function fetchPosition() {
     try {
         const res = await fetch("/api/position");
         const pos = await res.json();
 
-        // Determine coordinates: prefer explicit x/y from API,
-        // fall back to roomPositions lookup
         let latlng;
         if ((pos.position_x > 0 || pos.position_y > 0)) {
             latlng = svgToLatLng(pos.position_x, pos.position_y);
@@ -253,9 +257,9 @@ async function fetchPosition() {
     }
 }
 
-// ============================================================
-// FLASH EFFECT on room change
-// ============================================================
+/*
+Flash the position marker with a quick scale animation to draw attention to room changes.
+*/
 function flashMarker() {
     const el = positionMarker.getElement();
     if (!el) return;
@@ -269,20 +273,6 @@ function flashMarker() {
     }, 200);
 }
 
-// ============================================================
-// MANUAL TESTING (browser console)
-// ============================================================
-window.jumpToRoom = function(roomName) {
-    const pos = roomPositions[roomName];
-    if (!pos) { console.warn("Room not found:", roomName); return; }
-    const latlng = svgToLatLng(pos.x, pos.y);
-    positionMarker.setLatLng(latlng);
-    map.panTo(latlng);
-};
-
-// ============================================================
-// RE-FIT ON RESIZE — keeps SVG filling the viewport
-// ============================================================
 window.addEventListener("resize", () => {
     if (!map) return;
     map.fitBounds(bounds, { padding: [0, 0] });

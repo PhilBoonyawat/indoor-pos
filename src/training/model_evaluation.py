@@ -15,6 +15,7 @@ import argparse
 import os
 import json
 import sqlite3
+from contextlib import closing
 import numpy as np
 import joblib
 
@@ -69,12 +70,11 @@ def load_bssid_to_ssid_map(db_path=DATABASE_PATH):
     Returns:
         dict of {bssid: ssid} for all APs in the database
     """
-    conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT bssid, ssid FROM ssid")
-    mapping = {}
-    for bssid, ssid in cursor.fetchall():
-        mapping[bssid] = ssid if ssid else "Hidden"
-    conn.close()
+    with closing(sqlite3.connect(db_path)) as conn:
+        cursor = conn.execute("SELECT bssid, ssid FROM ssid")
+        mapping = {}
+        for bssid, ssid in cursor.fetchall():
+            mapping[bssid] = ssid if ssid else "Hidden"
     return mapping
 
 

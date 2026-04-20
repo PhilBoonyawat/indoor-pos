@@ -14,7 +14,10 @@ import pytest
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
+from src.app.predictor import Predictor
+from src.app.scanner_thread import ScannerThread
 from src.training.preprocess import load_and_preprocess
+from src.training.model_loader import load_models_from_config 
 
 
 # ── Shared constants ────────────────────────────────────────────────
@@ -285,6 +288,100 @@ def sample_fingerprint():
     A realistic WiFi fingerprint — one RSSI reading per known AP.
 
     Returns:
-        A dict mapping BSSID to RSSI, simulating a live scan with all known AP
+        A dict mapping BSSID to RSSI, simulating a live scan with all known APs.
     """
     return {bssid: -60 + i * 3 for i, bssid in enumerate(TEST_BSSIDS)}
+
+
+# ── Predictor + scanner fixtures ───────────────────────────────────
+
+@pytest.fixture
+def demo_predictor():
+    """
+    Predictor with no models loaded — forces demo mode.
+
+    Returns:
+        A Predictor instance configured for demo mode.
+    """
+    return Predictor(models_dir=None)
+
+
+@pytest.fixture
+def live_predictor(trained_models_dir):
+    """
+    Predictor with trained models loaded from trained_models_dir.
+
+    Args:
+        trained_models_dir: fixture providing a directory with trained models.
+
+    Returns:
+        A Predictor instance ready for live predictions.
+    """
+    return Predictor(models_dir=trained_models_dir)
+
+
+@pytest.fixture
+def scanner(demo_predictor, test_db):
+    """
+    Scanner thread backed by demo_predictor. Automatically stopped on teardown.
+
+    Args:
+        demo_predictor: fixture providing a demo-mode Predictor.
+        test_db: fixture providing a populated SQLite database path.
+
+    Yields:
+        A ScannerThread instance; stopped after the test if still running.
+    """
+    s = ScannerThread(predictor=demo_predictor, interval=1, db_path=test_db)
+    yield s
+    if s.is_running():
+        s.stop()
+
+
+@pytest.fixture
+def live_scanner(live_predictor, test_db):
+    """
+    Scanner thread backed by live_predictor (real trained models).
+    Automatically stopped on teardown.
+
+    Args:
+        live_predictor: fixture providing a Predictor with trained models.
+        test_db: fixture providing a populated SQLite database path.
+
+    Yields:
+        A ScannerThread instance; stopped after the test if still running.
+    """
+    s = ScannerThread(predictor=live_predictor, interval=1, db_path=test_db)
+    yield s
+    if s.is_running():
+        s.stop()
+
+
+# ── Training-pipeline fixtures ─────────────────────────────────────
+
+@pytest.fixture
+def training_data(test_db):
+    """
+    Preprocessed data from test_db using the standard stratified split.
+
+    Args:
+        test_db: fixture providing a populated SQLite database path.
+
+    Returns:
+        Tuple of (X_train, X_test, y_train, y_test, features, label_encoder, scaler).
+    """
+    return load_and_preprocess(test_db)
+
+
+@pytest.fixture
+def quick_models(model_config):
+    """
+    Loads all four model instances from the model_config fixture.
+
+    Args:
+        model_config: fixture providing path to a fast-training model config.
+
+    Returns:
+        dict mapping model_name to (model_instance, description_string).
+    """
+    return load_models_from_config(model_config)

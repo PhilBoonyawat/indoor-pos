@@ -1,3 +1,7 @@
+"""
+app.py - FastAPI backend for indoor positioning system
+"""
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
