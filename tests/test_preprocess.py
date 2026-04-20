@@ -1,5 +1,4 @@
 """Tests for src/training/preprocess.py"""
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,8 +14,7 @@ from src.training.preprocess import (
 
 
 class TestLoadFingerprints:
-    """Pivoting raw SQL rows into a (scans × BSSIDs) matrix."""
-
+    """Pivoting raw SQL rows into a (scans x BSSIDs) matrix."""
     def test_returns_dataframe_and_labels(self, test_db):
         fingerprints, labels = load_fingerprints_from_db(test_db)
         assert isinstance(fingerprints, pd.DataFrame)
@@ -33,7 +31,7 @@ class TestLoadFingerprints:
 
     def test_all_rooms_present(self, test_db):
         _, labels = load_fingerprints_from_db(test_db)
-        assert set(labels.values) == {"(S) 7.01", "(S) 7.02", "(S) 7.03", "(S) 7.06"}
+        assert set(labels.values) == {"(S)7.01", "(S)7.02", "(S)7.03", "(S)7.06"}
 
     def test_rssi_values_in_valid_range(self, test_db):
         """RSSI values must be between -100 (floor) and 0 (ceiling)."""
@@ -57,7 +55,6 @@ class TestLoadFingerprints:
 
 class TestFilterLowVarianceAPs:
     """Removes APs that are rarely seen."""
-
     def test_keeps_all_if_all_common(self, test_db):
         fingerprints, _ = load_fingerprints_from_db(test_db)
         filtered = filter_low_variance_aps(fingerprints, min_detection_rate=0.05)
@@ -88,7 +85,6 @@ class TestFilterLowVarianceAPs:
 
 class TestNormaliseRSSI:
     """MinMax scaling RSSI to [0, 1]."""
-
     def test_values_in_zero_to_one(self, test_db):
         fingerprints, _ = load_fingerprints_from_db(test_db)
         normalised, _ = normalise_rssi(fingerprints)
@@ -120,7 +116,7 @@ class TestNormaliseRSSI:
 
 
 class TestLoadAndPreprocess:
-    """End-to-end: DB → ready-to-train arrays."""
+    """End-to-end: DB -> ready-to-train arrays."""
 
     def test_returns_seven_items(self, test_db):
         result = load_and_preprocess(test_db)
@@ -145,7 +141,7 @@ class TestLoadAndPreprocess:
 
     def test_label_encoder_covers_all_rooms(self, test_db):
         _, _, _, _, _, le, _ = load_and_preprocess(test_db)
-        assert set(le.classes_) == {"(S) 7.01", "(S) 7.02", "(S) 7.03", "(S) 7.06"}
+        assert set(le.classes_) == {"(S)7.01", "(S)7.02", "(S)7.03", "(S)7.06"}
 
     def test_stratified_split_includes_every_room(self, test_db):
         _, _, y_train, y_test, _, le, _ = load_and_preprocess(test_db)

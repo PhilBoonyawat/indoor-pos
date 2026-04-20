@@ -1,11 +1,5 @@
 """
-Shared test fixtures for the Indoor Position Tracker test suite.
-
-Organisation:
-- Constants at the top: TEST_ROOMS, TEST_BSSIDS, SCANS_PER_ROOM
-- Factory fixtures: make_scan_data 
-- Data fixtures: test_db, empty_db, sample_fingerprint
-- File/dir fixtures: trained_models_dir, model_config
+conftest.py - Shared test fixtures for the Indoor Position Tracker test suite.
 """
 
 import json
@@ -25,7 +19,7 @@ from src.training.preprocess import load_and_preprocess
 
 # ── Shared constants ────────────────────────────────────────────────
 
-TEST_ROOMS = ["(S) 7.01", "(S) 7.02", "(S) 7.03", "(S) 7.06"]
+TEST_ROOMS = ["(S)7.01", "(S)7.02", "(S)7.03", "(S)7.06"]
 TEST_BSSIDS = [f"aa:bb:cc:dd:ee:{i:02x}" for i in range(10)]
 SCANS_PER_ROOM = 40
 
@@ -41,9 +35,9 @@ def make_scan_data():
     Returns:
         Function that creates scan_data lists with specified parameters.
     """
-    def _make(n_aps=5, location="(S) 7.01", orientation="N",
+    def _make(n_aps=5, location="(S)7.01", orientation="N",
               timestamp="2024-01-01T10:00:00"):
-        """
+        """ 
         Returns:
             List of dicts representing WiFi scan results, with specified
             number of APs and metadata.
@@ -185,7 +179,10 @@ def empty_db(tmp_path):
 @pytest.fixture
 def trained_models_dir(tmp_path, test_db):
     """
-    Directory containing two trained models plus all metadata files.
+    Directory containing two trained models: 
+        - weighted_knn.pkl: KNN with n_neighbors=3, distance weighting, Manhattan metric
+        - random_forest.pkl: Random Forest with 50 trees, max_features=log2,
+    
 
     Args:
         tmp_path: pytest fixture that provides a temporary directory unique to the test invocation.
@@ -203,7 +200,7 @@ def trained_models_dir(tmp_path, test_db):
     knn.fit(X_train, y_train)
     joblib.dump(knn, os.path.join(models_dir, "weighted_knn.pkl"))
 
-    rf = RandomForestClassifier(n_estimators=50, random_state=42, max_features="log2", n_jobs=-1, max_depth=null, min_samples_leaf=1, min_samples_split=5)
+    rf = RandomForestClassifier(n_estimators=50, random_state=42, max_features="log2", n_jobs=-1, max_depth=None, min_samples_leaf=1, min_samples_split=5)
     rf.fit(X_train, y_train)
     joblib.dump(rf, os.path.join(models_dir, "random_forest.pkl"))
 

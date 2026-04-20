@@ -106,8 +106,8 @@ def filter_low_variance_aps(fingerprints, min_detection_rate=0.05):
 def normalise_rssi(fingerprints):
     """
     Min-max normalise RSSI values to [0, 1].
-    -100 (not detected) → 0.0
-    0 (max signal) → 1.0
+    -100 (not detected) -> 0.0
+    0 (max signal) -> 1.0
 
     Args:
         fingerprints: DataFrame of RSSI values (rows=scans, columns=BSSIDs)
@@ -160,7 +160,7 @@ def load_and_preprocess(db_path=DEFAULT_DB_PATH, test_size=0.2, random_state=42,
 
     print(f"\n[Preprocess] Label mapping:")
     for i, room in enumerate(label_encoder.classes_):
-        print(f"  {i} → {room}")
+        print(f"  {i} -> {room}")
 
     X_train, X_test, y_train, y_test = train_test_split(
         fingerprints_norm.values,
@@ -240,7 +240,7 @@ def load_and_preprocess_temporal(db_path=DEFAULT_DB_PATH, test_ratio=0.2, min_de
     label_encoder = LabelEncoder()
     all_labels = label_encoder.fit_transform(scan_info['location'])
 
-    # Temporal split: per room, first 80% → train, last 20% → test
+    # Temporal split: per room, first 80% -> train, last 20% -> test
     train_indices = []
     test_indices = []
 
@@ -273,8 +273,8 @@ def load_and_preprocess_temporal(db_path=DEFAULT_DB_PATH, test_ratio=0.2, min_de
     # Show time ranges
     train_timestamps = scan_info.iloc[train_indices]['timestamp']
     test_timestamps = scan_info.iloc[test_indices]['timestamp']
-    print(f"\n[Temporal] Train time range: {train_timestamps.min()} → {train_timestamps.max()}")
-    print(f"[Temporal] Test time range:  {test_timestamps.min()} → {test_timestamps.max()}")
+    print(f"\n[Temporal] Train time range: {train_timestamps.min()} -> {train_timestamps.max()}")
+    print(f"[Temporal] Test time range:  {test_timestamps.min()} -> {test_timestamps.max()}")
     print("=" * 50)
 
     return X_train, X_test, y_train, y_test, feature_names, label_encoder, scaler

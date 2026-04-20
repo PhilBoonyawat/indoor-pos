@@ -359,7 +359,7 @@ def temporal_validation(models, X_train, X_test, y_train, y_test, label_encoder)
     """
     print("\n" + "=" * 60)
     print("  TEMPORAL VALIDATION — Data Leakage Test")
-    print("  (Train on early scans → Test on later scans)")
+    print("  (Train on early scans -> Test on later scans)")
     print("=" * 60)
 
     temporal_results = {}

@@ -1,4 +1,4 @@
-"""Tests for src/app/app.py — FastAPI endpoints."""
+"""Tests for src/app/app.py — API endpoints."""
 
 import os
 import sys
@@ -6,39 +6,44 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import src.app.app as app_module
+from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client(trained_models_dir, test_db):
     """
     Set up a TestClient with a real predictor but a mocked scanner.
     The mocked scanner stops the background thread from running in tests.
+
+    Args:
+        trained_models_dir: Fixture providing path to trained models
+        test_db: Fixture providing path to test database
     """
-    # Ensure static dir exists — app.py mounts it on import
     static_dir = os.path.join(
         os.path.dirname(__file__), "..", "src", "app", "static"
     )
     os.makedirs(static_dir, exist_ok=True)
+
     index_path = os.path.join(static_dir, "index.html")
     if not os.path.exists(index_path):
+        # Create a dummy index.html if it doesn't exist, since the app serves this on the root route
         with open(index_path, "w") as f:
             f.write("<html><body>test</body></html>")
 
     # Configure via env vars — app.py reads these on import
     os.environ["MODELS_DIR"] = trained_models_dir
     os.environ["DB_PATH"] = test_db
-    os.environ["SCAN_INTERVAL"] = "60"
+    os.environ["SCAN_INTERVAL"] = "3"
 
     # Force reimport so env vars take effect
     for mod_name in ("src.app.app", "src.app.predictor", "src.app.scanner_thread"):
         sys.modules.pop(mod_name, None)
 
-    import src.app.app as app_module
-
     # Stop the real scanner and swap in a mock
     app_module.scanner.stop()
     mock = MagicMock()
     mock.get_current_position.return_value = {
-        "room": "(S) 7.02",
+        "room": "(S)7.02",
         "confidence": 0.95,
         "model_used": "Random Forest",
         "position_x": 100,
@@ -49,7 +54,7 @@ def client(trained_models_dir, test_db):
     }
     mock.get_history.return_value = [
         {
-            "room": "(S) 7.01",
+            "room": "(S)7.01",
             "confidence": 0.92,
             "model_used": "Random Forest",
             "position_x": 0,
@@ -64,7 +69,6 @@ def client(trained_models_dir, test_db):
     mock.interval = 3
     app_module.scanner = mock
 
-    from fastapi.testclient import TestClient
     yield TestClient(app_module.app)
 
     for mod_name in ("src.app.app", "src.app.predictor", "src.app.scanner_thread"):
@@ -72,12 +76,16 @@ def client(trained_models_dir, test_db):
 
 
 class TestPositionEndpoint:
+    """
+    Test the /api/position endpoint returns the expected fields and values.
+    """
+    
     def test_returns_200(self, client):
         assert client.get("/api/position").status_code == 200
 
     def test_returns_expected_fields(self, client):
         data = client.get("/api/position").json()
-        assert data["room"] == "(S) 7.02"
+        assert data["room"] == "(S)7.02"
         assert data["confidence"] == 0.95
         assert data["mode"] == "live"
 
@@ -88,6 +96,10 @@ class TestPositionEndpoint:
 
 
 class TestScanHistoryEndpoint:
+    """
+    Test the /api/scan-history endpoint returns a list of past scans with timestamps.
+    """
+    
     def test_returns_list(self, client):
         data = client.get("/api/scan-history").json()
         assert isinstance(data, list)
@@ -99,6 +111,10 @@ class TestScanHistoryEndpoint:
 
 
 class TestStatusEndpoint:
+    """
+    Test the /api/status endpoint returns current scanning status and config.
+    """
+    
     def test_returns_all_fields(self, client):
         data = client.get("/api/status").json()
         assert data["scanning"] is True
@@ -109,6 +125,10 @@ class TestStatusEndpoint:
 
 
 class TestModelEndpoints:
+    """
+    Test the /api/models and /api/model endpoints for listing and switching models.
+    """
+    
     def test_get_models_lists_available(self, client):
         data = client.get("/api/models").json()
         assert "active" in data
@@ -128,6 +148,10 @@ class TestModelEndpoints:
 
 
 class TestRoomPositionsEndpoint:
+    """
+    Test the /api/room-positions endpoint returns a mapping of room names to coordinates.
+    """
+    
     def test_returns_mapping(self, client):
         data = client.get("/api/room-positions").json()
         assert isinstance(data, dict)
@@ -140,6 +164,10 @@ class TestRoomPositionsEndpoint:
 
 
 class TestRootRoute:
+    """
+    Test the root route serves the index.html page.
+    """
+    
     def test_root_serves_index_html(self, client):
         resp = client.get("/")
         assert resp.status_code == 200

@@ -1,5 +1,4 @@
 """Tests for src/training/model_loader.py"""
-
 import json
 
 import pytest
@@ -8,12 +7,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
-from src.training.model_loader import load_models_from_config, save_best_params
+from unittest.mock import patch
 
+from src.training.model_loader import load_models_from_config, save_best_params, DEFAULT_CONFIG_PATH
 
-# ── Loading config ─────────────────────────────────────────────
 
 class TestLoadModelsFromConfig:
+    """Tests for the load_models_from_config function, which loads model configurations from JSON and creates scikit-learn model instances."""
     def test_loads_all_four_models(self, model_config):
         models = load_models_from_config(model_config)
         assert set(models.keys()) == {"Weighted KNN", "Random Forest", "SVM", "MLP"}
@@ -48,7 +48,6 @@ class TestLoadModelsFromConfig:
         assert svm.probability is True
 
     def test_mlp_list_converted_to_tuple(self, model_config):
-        """JSON stores layers as a list; sklearn requires a tuple."""
         mlp, _ = load_models_from_config(model_config)["MLP"]
         assert isinstance(mlp.hidden_layer_sizes, tuple)
         assert mlp.hidden_layer_sizes == (64, 32)
@@ -85,10 +84,25 @@ class TestLoadModelsFromConfig:
         assert "n_neighbors" in desc
         assert "weights" in desc
 
+    def test_default_config_path_used_when_path_is_none(self, model_config):
+        with patch("src.training.model_loader.DEFAULT_CONFIG_PATH", model_config):
+            models = load_models_from_config(None)
 
-# ── Saving best params ─────────────────────────────────────────
+        assert set(models.keys()) == {"Weighted KNN", "Random Forest", "SVM", "MLP"}
+
+
+    def test_models_are_loaded_when_path_is_none(self, model_config):
+        with patch("src.training.model_loader.DEFAULT_CONFIG_PATH", model_config):
+            models = load_models_from_config(None)
+
+        assert "Weighted KNN" in models
+        assert "Random Forest" in models
+        assert "SVM" in models
+        assert "MLP" in models
+
 
 class TestSaveBestParams:
+    """Tests for the save_best_params function, which updates the model_configs.json file with the best hyperparameters found during tuning."""
     def test_updates_tuned_params(self, model_config):
         save_best_params(
             {"Weighted KNN": {"best_params": {"n_neighbors": 7, "weights": "uniform"}}},
@@ -106,11 +120,9 @@ class TestSaveBestParams:
         )
         with open(model_config) as f:
             updated = json.load(f)
-        # metric wasn't in best_params — should still equal "manhattan"
         assert updated["Weighted KNN"]["params"]["metric"] == "manhattan"
 
     def test_tuple_is_converted_to_list_for_json(self, model_config):
-        """JSON can't serialise tuples — save must convert."""
         save_best_params(
             {"MLP": {"best_params": {"hidden_layer_sizes": (256, 128)}}},
             model_config,
@@ -120,12 +132,18 @@ class TestSaveBestParams:
         assert updated["MLP"]["params"]["hidden_layer_sizes"] == [256, 128]
 
     def test_models_not_in_config_are_skipped(self, model_config):
-        """Should log a warning but not raise."""
+        with open(model_config, "r") as f:
+            before = json.load(f)
+
         save_best_params(
             {"Nonexistent Model": {"best_params": {"foo": "bar"}}},
             model_config,
         )
-        # Success = no exception
+
+        with open(model_config, "r") as f:
+            after = json.load(f)
+
+        assert after == before
 
     def test_other_models_unchanged(self, model_config):
         save_best_params(
@@ -134,7 +152,6 @@ class TestSaveBestParams:
         )
         with open(model_config) as f:
             updated = json.load(f)
-        # SVM config should be untouched
         assert updated["SVM"]["params"]["C"] == 10
 
     def test_multiple_models_updated_at_once(self, model_config):
@@ -149,3 +166,15 @@ class TestSaveBestParams:
             updated = json.load(f)
         assert updated["Weighted KNN"]["params"]["n_neighbors"] == 5
         assert updated["SVM"]["params"]["C"] == 100
+
+    def test_params_are_saved_to_default_config_path_when_path_is_none(self, model_config):
+        with patch("src.training.model_loader.DEFAULT_CONFIG_PATH", model_config):
+            save_best_params(
+                {"Weighted KNN": {"best_params": {"n_neighbors": 10}}},
+                None,
+            )
+
+        with open(model_config) as f:
+            updated = json.load(f)
+
+        assert updated["Weighted KNN"]["params"]["n_neighbors"] == 10

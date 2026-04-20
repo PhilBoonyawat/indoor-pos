@@ -72,7 +72,7 @@ def main():
     """
     Main function to parse arguments and run the scans.
     """
-    
+
     args = parse_args()
     run_scans(args.location, args.orientation, args.num_scans, args.interval)
 

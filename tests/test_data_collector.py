@@ -1,17 +1,10 @@
 """Tests for src/data_collection/data_collector_service.py"""
-
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-
-# ── Mock macOS-only modules BEFORE importing the module under test ──
-# Using direct assignment (not setdefault) so even on macOS — where the real
-# CoreWLAN is importable — we still use our mock. Without this, the tests
-# that patch CWWiFiClient wouldn't work because the real module would be in
-# sys.modules already.
-
+# Mock CoreWLAN and location_service so tests can run on any OS without needing real Wi-Fi scans or location permissions
 _mock_corewlan = MagicMock()
 _mock_location_service = MagicMock()
 _mock_location_service.retrieve_current_location = MagicMock(
@@ -23,7 +16,7 @@ sys.modules["data_collection"] = MagicMock()
 sys.modules["data_collection.location_service"] = _mock_location_service
 sys.modules["data_collection.db_service"] = MagicMock()
 
-from src.data_collection.data_collector_service import (  # noqa: E402
+from src.data_collection.data_collector_service import (  
     parse_args,
     scan_for_networks,
     write_data_to_db,
@@ -31,10 +24,14 @@ from src.data_collection.data_collector_service import (  # noqa: E402
 
 
 class TestParseArgs:
+    """
+    Test the command-line argument parsing for location and orientation.
+    """
+    
     def test_parses_both_args_short(self):
-        with patch("sys.argv", ["prog", "-l", "(S) 7.01", "-f", "N"]):
+        with patch("sys.argv", ["prog", "-l", "(S)7.01", "-f", "N"]):
             args = parse_args()
-        assert args.location == "(S) 7.01"
+        assert args.location == "(S)7.01"
         assert args.orientation == "N"
 
     def test_parses_both_args_long(self):
@@ -51,7 +48,9 @@ class TestParseArgs:
 
 
 class TestWriteDataToDBValidation:
-    """Input validation happens before any scanning — test that first."""
+    """
+    Test that write_data_to_db raises ValueError when location or orientation is missing.
+    """
 
     def test_none_location_raises(self):
         with pytest.raises(ValueError, match="Location is required"):
@@ -63,15 +62,17 @@ class TestWriteDataToDBValidation:
 
     def test_none_orientation_raises(self):
         with pytest.raises(ValueError, match="Orientation is required"):
-            write_data_to_db("(S) 7.01", None)
+            write_data_to_db("(S)7.01", None)
 
     def test_empty_orientation_raises(self):
         with pytest.raises(ValueError, match="Orientation is required"):
-            write_data_to_db("(S) 7.01", "")
+            write_data_to_db("(S)7.01", "")
 
 
 class TestWriteDataToDBHappyPath:
-    """Covers the successful scan → init_db → store path (lines 59-65)."""
+    """
+    Tests that write_data_to_db calls the expected functions in the correct order and handles errors properly.
+    """
 
     def test_calls_scan_init_and_store_in_order(self):
         fake_scan_data = [{"bssid": "aa:bb", "ssid": "net", "rssi": -60}]
@@ -82,15 +83,14 @@ class TestWriteDataToDBHappyPath:
              patch("src.data_collection.data_collector_service.init_db",
                    return_value=fake_conn) as mock_init, \
              patch("src.data_collection.data_collector_service.store_raw_scan") as mock_store:
-            write_data_to_db("(S) 7.01", "N")
+            write_data_to_db("(S)7.01", "N")
 
-        mock_scan.assert_called_once_with("(S) 7.01", "N")
+        mock_scan.assert_called_once_with("(S)7.01", "N")
         mock_init.assert_called_once()
         mock_store.assert_called_once_with(fake_conn, fake_scan_data)
         fake_conn.close.assert_called_once()
 
     def test_closes_connection_even_if_store_fails(self):
-        """Connection must be closed (try/finally) even on store_raw_scan error."""
         fake_conn = MagicMock()
 
         with patch("src.data_collection.data_collector_service.scan_for_networks",
@@ -100,16 +100,30 @@ class TestWriteDataToDBHappyPath:
              patch("src.data_collection.data_collector_service.store_raw_scan",
                    side_effect=RuntimeError("DB write failed")):
             with pytest.raises(RuntimeError, match="DB write failed"):
-                write_data_to_db("(S) 7.01", "N")
+                write_data_to_db("(S)7.01", "N")
 
         fake_conn.close.assert_called_once()
 
 
 class TestScanForNetworks:
-    """scan_for_networks is heavily mocked — we only verify shape and logic."""
+    """
+    Test the scan_for_networks function's behavior with mocked CoreWLAN and location retrieval.
+    """
 
     def _make_mock_scan(self, bssid, ssid="Net", rssi=-60, channel=6, noise=-95):
-        """Create a mock CoreWLAN scan result object."""
+        """
+        Create a mock CoreWLAN scan result object.
+        
+        Args:
+            bssid: The BSSID to return from the mock scan.
+            ssid: The SSID to return from the mock scan (default "Net").
+            rssi: The RSSI value to return from the mock scan (default -60).
+            channel: The Wi-Fi channel number to return (default 6).
+            noise: The noise measurement to return (default -95).
+
+        Returns:
+            A MagicMock object that simulates a CoreWLAN scan result with the specified properties.
+        """
         scan = MagicMock()
         scan.bssid.return_value = bssid
         scan.ssid.return_value = ssid
@@ -128,16 +142,15 @@ class TestScanForNetworks:
             iface = mock_client.sharedWiFiClient.return_value.interface.return_value
             iface.scanForNetworksWithName_error_.return_value = (scans, None)
 
-            result = scan_for_networks("(S) 7.01", "N")
+            result = scan_for_networks("(S)7.01", "N")
 
         assert len(result) == 2
         assert result[0]["bssid"] == "aa:bb:cc:dd:ee:01"
         assert result[0]["rssi"] == -55
-        assert result[0]["location"] == "(S) 7.01"
+        assert result[0]["location"] == "(S)7.01"
         assert result[0]["orientation"] == "N"
 
     def test_deduplicates_bssids_in_single_scan(self):
-        """If CoreWLAN returns the same BSSID twice, keep only one."""
         scans = [
             self._make_mock_scan("aa:bb:cc:dd:ee:01"),
             self._make_mock_scan("aa:bb:cc:dd:ee:01"),  # duplicate
@@ -176,7 +189,6 @@ class TestScanForNetworks:
         assert result[0]["longitude"] == -74.0
 
     def test_handles_no_location_gracefully(self):
-        """If retrieve_current_location returns None, lat/lon fields become None."""
         scans = [self._make_mock_scan("aa:bb:cc:dd:ee:01")]
 
         with patch("src.data_collection.data_collector_service.retrieve_current_location",

@@ -5,7 +5,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
 filterwarnings = [
-    "ignore::sklearn.exceptions.FitFailedWarning",
+    "ignore:.*FitFailedWarning.*",
     "ignore:Tight layout not applied.*:UserWarning",
 ]
 
@@ -13,10 +13,7 @@ filterwarnings = [
 source = ["src"]
 branch = true
 omit = [
-    "src/data_collection/location_service.py",
-    "src/training/data_efficiency_analysis.py",
-    "src/training/hyperparameter_tuning.py",
-    "*/test_*",
+    "*/test_*"
 ]
 
 [tool.coverage.report]

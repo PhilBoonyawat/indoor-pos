@@ -44,7 +44,7 @@ OUTPUT_DIR = os.path.join(
     '..', '..', 'assets', 'data_efficiency'
 )
 
-DATABASE_DIFAULT_PATH = os.path.join(
+DATABASE_DEFAULT_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     '..', '..', 'data', 'raw', 'wifi_scans.db'
 )
@@ -256,7 +256,7 @@ def parse_args():
     Parse command-line arguments for the data efficiency experiment.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--db', type=str, default=DATABASE_DIFAULT_PATH)
+    parser.add_argument('--db', type=str, default=DATABASE_DEFAULT_PATH)
     parser.add_argument('--output', type=str, default=OUTPUT_DIR)
     return parser.parse_args()
     

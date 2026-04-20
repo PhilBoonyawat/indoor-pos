@@ -175,7 +175,7 @@ def feature_importance_analysis(feature_names, models_dir=MODEL_DIRECTORY,
         feature_names: list of feature names (BSSIDs) corresponding to model input
         models_dir: directory where trained model files are stored
         output_dir: directory to save the plot
-        db_path: path to database for BSSID→SSID mapping
+        db_path: path to database for BSSID -> SSID mapping
         top_n: number of top features to display
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -183,7 +183,7 @@ def feature_importance_analysis(feature_names, models_dir=MODEL_DIRECTORY,
     bssid_to_ssid = {}
     if db_path and os.path.exists(db_path):
         bssid_to_ssid = load_bssid_to_ssid_map(db_path)
-        print(f"[Evaluate] Loaded {len(bssid_to_ssid)} BSSID→SSID mappings")
+        print(f"[Evaluate] Loaded {len(bssid_to_ssid)} BSSID -> SSID mappings")
 
     model_path = os.path.join(models_dir, 'random_forest.pkl')
     if not os.path.exists(model_path):
@@ -304,7 +304,7 @@ def misclassification_analysis(results, label_encoder, output_dir=FIG_OUTPUT_DIR
         for i in range(len(classes)):
             for j in range(len(classes)):
                 if i != j and cm[i][j] > 0:
-                    pair = f"{classes[i]}\n→ {classes[j]}"
+                    pair = f"{classes[i]}\n-> {classes[j]}"
                     if pair not in all_confusions:
                         all_confusions[pair] = {m: 0 for m in model_names}
                     all_confusions[pair][name] = cm[i][j]

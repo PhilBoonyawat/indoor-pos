@@ -1,24 +1,16 @@
 """Tests for src/training/model_evaluation.py"""
 
-import json
 import os
+import json
 from unittest.mock import patch
 
-import matplotlib
 import pytest
 import numpy as np
 
 from sklearn.preprocessing import LabelEncoder
 
-matplotlib.use("Agg")
-matplotlib.rcParams["text.usetex"] = False
-
-
-@pytest.fixture(autouse=True)
-def _no_latex():
-    """Disable LaTeX rendering for every test."""
-    matplotlib.rcParams["text.usetex"] = False
-
+import pytest
+from unittest.mock import patch
 
 from src.training.model_evaluation import (
     evaluate_models,
@@ -33,20 +25,34 @@ from src.training.model_evaluation import (
 from src.training.preprocess import load_and_preprocess
 
 
-# ── Shared fixture ─────────────────────────────────────────────
-
 @pytest.fixture
 def eval_results(trained_models_dir, test_db):
-    """Run evaluate_models once so multiple test classes can reuse the output."""
+    """
+    Run evaluate_models once so multiple test classes can reuse the output.
+    
+    Args:
+        trained_models_dir: Fixture providing path to directory with trained .pkl models.
+        test_db: Fixture providing path to test database.
+
+    Returns:
+        Tuple of (results, label_encoder, features, X_train, y_train) where:
+        - results is the dict output from evaluate_models
+        - label_encoder is the LabelEncoder instance used to decode class labels
+        - features is the list of feature names (BSSIDs)
+        - X_train and y_train are the training data and labels used to train the models (useful for feature importance analysis)
+    """
     X_train, X_test, y_train, y_test, features, le, scaler = load_and_preprocess(test_db)
     models = load_trained_models(trained_models_dir)
     results = evaluate_models(models, X_test, y_test, le)
     return results, le, features, X_train, y_train
 
 
-# ── BSSID ↔ SSID lookup helpers ─────────────────────────────────
-
 class TestLoadBssidToSsidMap:
+    """
+    Tests for the load_bssid_to_ssid_map function, which loads a mapping of BSSID to SSID from the database.
+    This mapping is used to create more informative labels for feature importance analysis.
+    """
+    
     def test_returns_dict_with_all_bssids(self, test_db):
         mapping = load_bssid_to_ssid_map(test_db)
         assert isinstance(mapping, dict)
@@ -58,6 +64,7 @@ class TestLoadBssidToSsidMap:
 
 
 class TestFormatApLabel:
+    """Tests for the format_ap_label function, which creates a human-readable label for an AP based on its BSSID and the BSSID->SSID mapping."""
     def test_known_bssid_uses_ssid_and_tail(self):
         label = format_ap_label("aa:bb:cc:dd:ee:ff", {"aa:bb:cc:dd:ee:ff": "eduroam"})
         assert "eduroam" in label
@@ -72,9 +79,8 @@ class TestFormatApLabel:
         assert isinstance(label, str)
 
 
-# ── Loading trained models from a directory ────────────────────
-
 class TestLoadTrainedModels:
+    """Tests for the load_trained_models function, which loads trained model .pkl files from a directory and returns a dict of model instances."""
     def test_loads_present_models(self, trained_models_dir):
         models = load_trained_models(trained_models_dir)
         assert set(models.keys()) >= {"Weighted KNN", "Random Forest"}
@@ -87,17 +93,18 @@ class TestLoadTrainedModels:
     def test_empty_directory_returns_empty_dict(self, tmp_path):
         assert load_trained_models(str(tmp_path)) == {}
 
-    def test_partial_models_loaded(self, trained_models_dir):
-        """Only the pkls that exist should be loaded."""
+    def test_only_existing_models_should_be_loaded(self, trained_models_dir):
         os.remove(os.path.join(trained_models_dir, "random_forest.pkl"))
         models = load_trained_models(trained_models_dir)
         assert "Weighted KNN" in models
         assert "Random Forest" not in models
 
 
-# ── Model evaluation on test set ───────────────────────────────
-
 class TestEvaluateModels:
+    """
+    Tests for the evaluate_models function, which takes trained model instances and test data, makes predictions, 
+    and computes evaluation metrics like accuracy and confusion matrix.
+    """
     def test_returns_entry_per_model(self, eval_results):
         results, _, _, _, _ = eval_results
         assert len(results) >= 2
@@ -120,11 +127,8 @@ class TestEvaluateModels:
             assert cm.shape[0] == cm.shape[1]
 
 
-# ── Plotting smoke tests ───────────────────────────────────────
-# Verify the plot functions complete and produce files.
-# We're not checking visual content — that's best verified by eye.
-
 class TestFeatureImportanceAnalysis:
+    """Tests for the feature_importance_analysis function, which generates a PDF report of the most important features (APs) according to the Random Forest model."""
     def test_produces_pdf(self, trained_models_dir, test_db, tmp_path):
         X_train, _, _, _, features, _, _ = load_and_preprocess(test_db)
         out = str(tmp_path)
@@ -155,10 +159,19 @@ class TestFeatureImportanceAnalysis:
 
 
 class TestLearningCurveAnalysis:
+    """Tests for the learning_curve_analysis function, which generates a PDF report of model performance as a function of training set size."""
     def test_produces_pdf(self, model_config, test_db, tmp_path):
-        """Patch the hardcoded MODEL_CONFIG_PATH so the test uses our fast config."""
         X_train, _, y_train, _, _, _, _ = load_and_preprocess(test_db)
         out = str(tmp_path)
+
+        with open(model_config, "r") as f:
+            config = json.load(f)
+
+        # Prevent MLP from creating an internal validation split on tiny CV folds
+        config["MLP"]["params"]["early_stopping"] = False
+
+        with open(model_config, "w") as f:
+            json.dump(config, f, indent=2)
 
         with patch("src.training.model_evaluation.MODEL_CONFIG_PATH", model_config):
             learning_curve_analysis(X_train, y_train, out)
@@ -167,20 +180,15 @@ class TestLearningCurveAnalysis:
 
 
 class TestMisclassificationAnalysis:
-    def test_produces_pdf_when_errors_exist(self, eval_results, tmp_path):
-        results, le, *_ = eval_results
-        out = str(tmp_path)
-        misclassification_analysis(results, le, out)
-        # May or may not produce plot — depends on whether there are misclassifications
-        # Either way it shouldn't raise
-        assert os.path.isdir(out)
-
+    """
+    Tests for the misclassification_analysis function, which generates a PDF report of the most common misclassification pairs 
+    (EX. Room A predicted as Room B) based on the confusion matrix and label encoder.
+    """
     def test_handles_no_errors_gracefully(self, trained_models_dir, test_db, tmp_path):
-        """If every prediction is correct, function returns early without crashing."""
         X_train, X_test, y_train, y_test, features, le, scaler = load_and_preprocess(test_db)
         models = load_trained_models(trained_models_dir)
 
-        # Craft a results dict where predictions == labels (no errors)
+        # Perfect results dictionary
         perfect_results = {
             name: {
                 "y_pred": y_test.copy(),
@@ -193,17 +201,12 @@ class TestMisclassificationAnalysis:
 
         out = str(tmp_path)
         misclassification_analysis(perfect_results, le, out)
-        # Should return early — no PDF generated
+        # No PDF generated
         assert not os.path.exists(os.path.join(out, "misclassification_pairs.pdf"))
-
-import pytest
-from unittest.mock import patch
-
-from src.training.model_evaluation import parse_args
 
 
 class TestParseArgs:
-
+    """Tests for the parse_args function, which parses command-line arguments for the model evaluation script."""
     def test_defaults(self):
         with patch("sys.argv", ["prog"]):
             args = parse_args()
@@ -242,22 +245,3 @@ class TestParseArgs:
         assert args.db == "my.db"
         assert args.models_dir == "models/"
         assert args.output == "out/"
-
-class TestMisclassificationAnalysis:
-    def test_no_misclassifications_returns_early(self, tmp_path):
-        le = LabelEncoder()
-        le.fit(["Room A", "Room B", "Room C"])
-
-        results = {
-            "Model A": {
-                "confusion_matrix": np.array([
-                    [5, 0, 0],
-                    [0, 4, 0],
-                    [0, 0, 6],
-                ])
-            }
-        }
-
-        misclassification_analysis(results, le, output_dir=str(tmp_path))
-
-        assert not (tmp_path / "misclassification_pairs.pdf").exists()

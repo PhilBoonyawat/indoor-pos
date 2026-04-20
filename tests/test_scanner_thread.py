@@ -1,13 +1,12 @@
+""" Tests for src/app/scanner_thread.py"""
 import time
 from unittest.mock import patch, MagicMock
 
 import pytest
+#TODO
 
 from src.app.predictor import Predictor
 from src.app.scanner_thread import ScannerThread
-
-
-# ── Fixtures ───────────────────────────────────────────────────
 
 @pytest.fixture
 def demo_predictor():
@@ -34,8 +33,6 @@ def live_scanner(live_predictor, test_db):
     if s.is_running():
         s.stop()
 
-
-# ── Init and state ─────────────────────────────────────────────
 
 class TestScannerInit:
     def test_default_position_is_unknown(self, scanner):
@@ -107,7 +104,7 @@ class TestScannerAdvancedLoop:
 
         with patch.object(live_scanner, "_try_live_scan", return_value=None), \
              patch.object(live_scanner.predictor, "predict", return_value={
-                 "room": "(S) 7.01",
+                 "room": "(S)7.01",
                  "confidence": 0.9,
                  "model_used": "RF",
                  "position_x": 0,
@@ -129,7 +126,7 @@ class TestScannerAdvancedLoop:
              patch.object(live_scanner, "_load_demo_scans"), \
              patch.object(live_scanner, "_get_demo_fingerprint", return_value={"demo": -60}), \
              patch.object(live_scanner.predictor, "predict", return_value={
-                 "room": "(S) 7.02",
+                 "room": "(S)7.02",
                  "confidence": 0.8,
                  "model_used": "RF",
                  "position_x": 0,
@@ -146,7 +143,7 @@ class TestScannerAdvancedLoop:
 
     def test_history_trimmed_to_100(self, live_scanner):
         fake_prediction = {
-            "room": "(S) 7.01",
+            "room": "(S)7.01",
             "confidence": 0.9,
             "model_used": "RF",
             "position_x": 0,
