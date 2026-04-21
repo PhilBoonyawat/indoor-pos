@@ -135,7 +135,7 @@ async function loadRoomPositions() {
 let trailPoints = [];
 let trailVisible = true;
 const trailLine = L.polyline([], {
-    color: "#3b82f6",
+    color: "#4635c5",
     weight: 2,
     opacity: 0.5,
     dashArray: "5, 8",
