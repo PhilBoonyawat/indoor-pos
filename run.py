@@ -2,10 +2,10 @@
 Indoor Position Tracker — Entry Point
 
 Usage:
-    python run.py                                    # Demo mode
-    python run.py --models-dir models/               # With trained models
-    python run.py --models-dir models/ --port 5000   # Custom port
-    python run.py --skip-location                    # Skip location permission check
+    python3 run.py                                    # Demo mode
+    python3 run.py --models-dir models/               # With trained models
+    python3 run.py --models-dir models/ --port 5000   # Custom port
+    python3 run.py --skip-location                    # Skip location permission check
 
 Open http://localhost:5000 in your browser.
 API docs at http://localhost:5000/docs
