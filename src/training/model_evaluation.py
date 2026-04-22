@@ -7,8 +7,8 @@ Provides:
     - Misclassification analysis (which rooms get confused)
 
 Usage:
-    python model_evaluation.py
-    python model_evaluation.py --db ../../data/raw/wifi_scans.db --models-dir ../../models/
+    python3 src/training/model_evaluation.py
+    python src/training/model_evaluation.py --db ../../data/raw/wifi_scans.db --models-dir ../../models/
 """
 
 import argparse
@@ -202,7 +202,7 @@ def feature_importance_analysis(feature_names, models_dir=MODEL_DIRECTORY,
         top_features = [feature_names[i] for i in indices]
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.barh(range(top_n), top_importances, color='#3b82f6', alpha=0.8)
+    ax.barh(range(top_n), top_importances, color='#4C72B0', alpha=0.8)
     ax.set_yticks(range(top_n))
     ax.set_yticklabels(top_features, fontsize=6)
     ax.set_xlabel('Feature Importance')
@@ -251,11 +251,11 @@ def learning_curve_analysis(X_train, y_train, output_dir=FIG_OUTPUT_DIRECTORY):
         val_std = val_scores.std(axis=1)
 
         ax.fill_between(train_sizes, train_mean - train_std, train_mean + train_std,
-                         alpha=0.1, color='#3b82f6')
+                         alpha=0.1, color='#4C72B0')
         ax.fill_between(train_sizes, val_mean - val_std, val_mean + val_std,
-                         alpha=0.1, color='#10b981')
-        ax.plot(train_sizes, train_mean, 'o-', color='#3b82f6', label='Training')
-        ax.plot(train_sizes, val_mean, 'o-', color='#10b981', label='Validation')
+                         alpha=0.1, color='#55A868')
+        ax.plot(train_sizes, train_mean, 'o-', color='#4C72B0', label='Training')
+        ax.plot(train_sizes, val_mean, 'o-', color='#55A868', label='Validation')
 
         ax.set_xlabel('Training Samples')
         ax.set_ylabel('F1 Score (weighted)')

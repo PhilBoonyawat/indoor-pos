@@ -190,9 +190,9 @@ def plot_rf_lines(results, output_dir):
         axes = [axes]
 
     colors = {
-        "None": "#48b0f9",
-        "10": "#009942",
-        "20": "#a02c2c"
+        "None": "#4C72B0",
+        "10": "#55A868",
+        "20": "#C44E52"
     }
 
     linestyles = {
@@ -266,7 +266,7 @@ def plot_svm_lines(results, output_dir):
     gammas = sorted(df["param_gamma"].unique())
 
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]
     linestyles = ["-", "--", ":", "-."]
     markers = ["o", "s", "^", "D"]
 
@@ -326,12 +326,20 @@ def plot_mlp_grid(results, output_dir):
 
     plt.figure(figsize=(6, 4))
 
+    palette = {
+        0.0001: "#1f77b4",
+        0.0005: "#d62728",
+        0.001: "#2ca02c",
+        0.01: "#DD8452",
+        0.1: "#9421a6"
+    }
+
     sns.barplot(
         data=df,
         x="architecture",
         y="mean_test_score",
         hue="lr",
-        palette="viridis"
+        palette=palette
     )
 
     plt.xlabel("Hidden Layer Architecture")

@@ -4,8 +4,8 @@ train.py — Train and compare 4 classification models for Wi-Fi fingerprint roo
 Models: Weighted KNN, Random Forest, MLP, SVM
 
 Usage:
-    python train.py                              # Uses default DB path and output directory
-    python train.py --db ../../data/raw/wifi_scans.db --output ../../models
+    python3 src/training/train.py                              # Uses default DB path and output directory
+    python3 src/training/train.py  --db ../../data/raw/wifi_scans.db --output ../../models
 
 Outputs:
     - Trained model files (.pkl) in output directory
@@ -190,7 +190,7 @@ def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
     x = np.arange(len(model_names))
     width = 0.35
 
-    bars1 = ax.bar(x - width/2, cv_means, width, label='CV F1 (weighted)', color='#3b82f6',
+    bars1 = ax.bar(x - width/2, cv_means, width, label='CV F1 (weighted)', color='#4C72B0',
                    yerr=cv_stds, capsize=5, alpha=0.9)
     bars2 = ax.bar(x + width/2, test_f1s, width,
                    label='Test F1 (weighted)')
@@ -247,13 +247,13 @@ def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
     train_times = [results[n]['train_time'] for n in model_names]
     predict_times = [results[n]['predict_time'] * 1000 for n in model_names]  # ms
 
-    ax1.barh(model_names, train_times, color='#f59e0b', alpha=0.9)
+    ax1.barh(model_names, train_times, color='#4C72B0', alpha=0.9)
     ax1.set_xlabel('Time (seconds)')
     ax1.set_title('Training Time', fontweight='bold')
     for i, v in enumerate(train_times):
         ax1.text(v + 0.02, i, f'{v:.2f}s', va='center', fontsize=9)
 
-    ax2.barh(model_names, predict_times, color='#8b5cf6', alpha=0.9)
+    ax2.barh(model_names, predict_times, color="#C44E52", alpha=0.9)
     ax2.set_xlabel('Time (milliseconds)')
     ax2.set_title('Prediction Time (full test set)', fontweight='bold')
     for i, v in enumerate(predict_times):
@@ -270,7 +270,7 @@ def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
     cv_data = [results[n]['cv_scores'] for n in model_names]
     bp = ax.boxplot(cv_data, tick_labels=model_names, patch_artist=True)
 
-    colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+    colors = ['#4C72B0', '#55A868', '#DD8452', '#C44E52', "#6e4ac0"]
     for patch, color in zip(bp['boxes'], colors[:len(model_names)]):
         patch.set_facecolor(color)
         patch.set_alpha(0.6)
@@ -419,8 +419,8 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
     x = np.arange(len(names))
     width = 0.35
 
-    bars1 = ax.bar(x - width/2, random_accs, width, label='Random Split', color='#3b82f6', alpha=0.9)
-    bars2 = ax.bar(x + width/2, temporal_accs, width, label='Temporal Split', color='#f59e0b', alpha=0.9)
+    bars1 = ax.bar(x - width/2, random_accs, width, label='Random Split', color='#4C72B0', alpha=0.9)
+    bars2 = ax.bar(x + width/2, temporal_accs, width, label='Temporal Split', color='#DD8452', alpha=0.9)
 
     ax.set_ylabel('Accuracy', fontsize=12)
     ax.set_title('Data Leakage Test — Random vs Temporal Split', fontsize=14, fontweight='bold')
@@ -587,9 +587,6 @@ def main():
 
     print(f"\n  Best model: {best_model} ({results[best_model]['test_accuracy']:.4f} random / {temporal_results.get(best_model, {}).get('test_accuracy', 0):.4f} temporal)")
     print(f"  Models saved to: {output_dir}")
-    print(f"\n  To use in the web app:")
-    safe_best = best_model.lower().replace(' ', '_')
-    print(f"    python run.py --model {output_dir}/{safe_best}.pkl")
     print("=" * 60)
 
 
