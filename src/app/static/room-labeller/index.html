@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Position Labeller</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">📍</div>
+        <h1>Room Labeller</h1>
+    </div>
+    <div class="header-right">
+        <div class="room-count"><strong id="count">0</strong> rooms mapped</div>
+        <button class="btn-secondary" id="upload-btn">
+            🗺️ Upload Floor Plan
+        </button>
+        <input type="file" id="file-input" accept="image/*" hidden>
+    </div>
+</header>
+
+<div class="main">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Rooms</h2>
+            <div class="input-group">
+                <input type="text" id="room-name-input" placeholder="EX. (S)7.01" />
+                <button class="btn-primary" id="add-room-btn">+ Add</button>
+            </div>
+        </div>
+        <div class="room-list" id="room-list">
+            <div class="empty-rooms">
+                <div class="icon">🏠</div>
+                <p>No rooms yet.<br>Add a room name and click on the floor plan.</p>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <button class="btn-success" id="export-btn" style="width:100%">
+                Export room_positions.json
+            </button>
+            <button class="btn-secondary" id="import-btn" style="width:100%">
+                Import existing JSON
+            </button>
+            <input type="file" id="import-input" accept=".json" hidden>
+        </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-area">
+        <div class="canvas-toolbar">
+            <div class="toolbar-left">
+                <span class="mode-badge idle" id="mode-badge">IDLE</span>
+                <span id="instruction-text" style="color: var(--text-secondary)">Upload a floor plan to begin</span>
+            </div>
+            <span class="cursor-coords" id="cursor-coords">x: — y: —</span>
+        </div>
+        <div class="canvas-container" id="canvas-container">
+            <div class="upload-prompt" id="upload-prompt">
+                <div class="icon">🗺️</div>
+                <p>Upload your floor plan image to get started</p>
+                <button class="btn-primary" id="choose-image-btn">
+                    Choose Image
+                </button>
+                <p class="hint" style="margin-top:12px">PNG, JPG — any resolution</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
