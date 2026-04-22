@@ -20,6 +20,7 @@ import time
 import warnings
 import numpy as np
 import joblib
+import math
 
 from preprocess import load_and_preprocess, load_and_preprocess_temporal
 
@@ -220,26 +221,42 @@ def plot_comparison(results, label_encoder, output_dir=FIG_OUTPUT_DIRECTORY):
 
     # ── 2. Confusion Matrices ────────────────────
     n_models = len(model_names)
-    fig, axes = plt.subplots(1, n_models, figsize=(4 * n_models, 3.5))
-    if n_models == 1:
-        axes = [axes]
+    ncols = 2
+    nrows = math.ceil(n_models / ncols)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 5.5 * nrows))
+    axes = np.atleast_1d(axes).flatten()
 
     for ax, name in zip(axes, model_names):
         cm = results[name]['confusion_matrix']
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
-                    xticklabels=label_encoder.classes_,
-                    yticklabels=label_encoder.classes_)
-        ax.set_title(f'{name}\nAcc: {results[name]["test_accuracy"]:.3f}', fontsize=11)
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('Actual')
-        ax.tick_params(axis='x', rotation=45)
-        ax.tick_params(axis='y', rotation=0)
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt='d',
+            cmap='Blues',
+            ax=ax,
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_
+        )
+        ax.set_title(f'{name}\nAcc: {results[name]["test_accuracy"]:.3f}', fontsize=14)
+        ax.set_xlabel('Predicted', fontsize=12)
+        ax.set_ylabel('Actual', fontsize=12)
+        ax.tick_params(axis='x', rotation=45, labelsize=12)
+        ax.tick_params(axis='y', rotation=0, labelsize=12)
 
-    plt.suptitle('Confusion Matrices — Per Model', fontsize=14, fontweight='bold', y=1.02)
+    # Hide any unused subplot axes
+    for ax in axes[len(model_names):]:
+        ax.axis('off')
+
+    plt.suptitle('Confusion Matrices — Per Model', fontsize=16, fontweight='bold', y=1.02)
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'confusion_matrices.pdf'), dpi=150, bbox_inches='tight')
+    plt.savefig(
+        os.path.join(output_dir, 'confusion_matrices.pdf'),
+        dpi=150,
+        bbox_inches='tight'
+    )
     plt.close()
-    print(f"[Plot] Saved confusion_matrices.pdf")
+    print("[Plot] Saved confusion_matrices.pdf")
 
     # ── 3. Training & Prediction Time ────────────
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3.5))
@@ -446,26 +463,60 @@ def plot_leakage_comparison(random_results, temporal_results, label_encoder, out
 
     # ── 2. Temporal confusion matrices ───────────
     n_models = len(names)
-    fig, axes = plt.subplots(1, n_models, figsize=(4 * n_models, 3.5))
-    if n_models == 1:
-        axes = [axes]
+    ncols = 2
+    nrows = math.ceil(n_models / ncols)
+
+    # Square-ish figure — 2 cols × 2 rows of square heatmaps want ~1:1 aspect
+    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 11))
+    axes = np.atleast_1d(axes).flatten()
 
     for ax, name in zip(axes, names):
         cm = temporal_results[name]['confusion_matrix']
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges', ax=ax,
-                    xticklabels=label_encoder.classes_,
-                    yticklabels=label_encoder.classes_)
-        ax.set_title(f'{name}\nTemporal Acc: {temporal_results[name]["test_accuracy"]:.3f}', fontsize=11)
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('Actual')
-        ax.tick_params(axis='x', rotation=45)
-        ax.tick_params(axis='y', rotation=0)
 
-    plt.suptitle('Temporal Split — Confusion Matrices', fontsize=14, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'temporal_confusion_matrices.pdf'), dpi=150, bbox_inches='tight')
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt='d',
+            cmap='Oranges',
+            ax=ax,
+            annot_kws={"size": 12, "weight": "bold"},
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_,
+            square=True,
+            cbar=False,
+            linewidths=0.5,
+            linecolor='white',
+        )
+
+        ax.set_title(
+            f'{name} — Acc: {temporal_results[name]["test_accuracy"]:.3f}',
+            fontsize=13,
+            fontweight='bold',
+            pad=10,
+        )
+        ax.set_xlabel('Predicted', fontsize=11, labelpad=6)
+        ax.set_ylabel('Actual', fontsize=11, labelpad=6)
+
+        ax.tick_params(axis='x', rotation=45, labelsize=10)
+        ax.tick_params(axis='y', rotation=0, labelsize=10)
+
+    for ax in axes[len(names):]:
+        ax.axis('off')
+
+    plt.suptitle(
+        'Temporal Split — Confusion Matrices',
+        fontsize=16,
+        fontweight='bold',
+    )
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(
+        os.path.join(output_dir, 'temporal_confusion_matrices.pdf'),
+        bbox_inches='tight',  # keep this so there's no wasted margin
+    )
     plt.close()
-    print(f"[Plot] Saved temporal_confusion_matrices.pdf")
+
+    print("[Plot] Saved temporal_confusion_matrices.pdf")
 
 def parse_args():
     """

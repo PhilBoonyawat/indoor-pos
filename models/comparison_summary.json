@@ -5,7 +5,7 @@
     "test_accuracy": 0.9978,
     "test_f1_weighted": 0.9978,
     "train_time_seconds": 0.002,
-    "predict_time_seconds": 0.12125,
+    "predict_time_seconds": 0.13815,
     "config": "n_neighbors=3, weights=distance, metric=manhattan"
   },
   "Random Forest": {
@@ -13,8 +13,8 @@
     "cv_f1_std": 0.0007,
     "test_accuracy": 0.9989,
     "test_f1_weighted": 0.9989,
-    "train_time_seconds": 0.082,
-    "predict_time_seconds": 0.0118,
+    "train_time_seconds": 0.104,
+    "predict_time_seconds": 0.01294,
     "config": "n_estimators=50, max_features=log2, max_depth=None, min_samples_split=5, min_samples_leaf=1"
   },
   "SVM": {
@@ -22,8 +22,8 @@
     "cv_f1_std": 0.0,
     "test_accuracy": 0.9967,
     "test_f1_weighted": 0.9967,
-    "train_time_seconds": 0.357,
-    "predict_time_seconds": 0.03809,
+    "train_time_seconds": 0.368,
+    "predict_time_seconds": 0.03863,
     "config": "kernel=rbf, C=10, gamma=scale"
   },
   "MLP": {
@@ -31,8 +31,8 @@
     "cv_f1_std": 0.0007,
     "test_accuracy": 0.9978,
     "test_f1_weighted": 0.9978,
-    "train_time_seconds": 0.551,
-    "predict_time_seconds": 0.00114,
+    "train_time_seconds": 0.62,
+    "predict_time_seconds": 0.00183,
     "config": "hidden_layer_sizes=(256, 128), alpha=1e-05, activation=relu, solver=adam, learning_rate=adaptive, learning_rate_init=0.0005, max_iter=500, early_stopping=True, validation_fraction=0.15, n_iter_no_change=20"
   },
   "_best_model": "Random Forest",

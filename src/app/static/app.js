@@ -135,9 +135,9 @@ async function loadRoomPositions() {
 let trailPoints = [];
 let trailVisible = true;
 const trailLine = L.polyline([], {
-    color: "#4635c5",
-    weight: 2,
-    opacity: 0.5,
+    color: "#c53535",
+    weight: 3,
+    opacity: 0.75,
     dashArray: "5, 8",
 }).addTo(map);
 
@@ -146,7 +146,7 @@ Trail management: keeps a history of recent positions and displays them as a das
 */
 function addTrailPoint(latlng) {
     trailPoints.push(latlng);
-    if (trailPoints.length > 50) trailPoints.shift();
+    if (trailPoints.length > 20) trailPoints.shift();
     if (trailVisible) trailLine.setLatLngs(trailPoints);
 }
 
