@@ -4,11 +4,11 @@ Indoor Position Tracker — Entry Point
 Usage:
     python3 run.py                                    # Demo mode
     python3 run.py --models-dir models/               # With trained models
-    python3 run.py --models-dir models/ --port 5000   # Custom port
+    python3 run.py --models-dir models/ --port 8000   # Custom port
     python3 run.py --skip-location                    # Skip location permission check
 
-Open http://localhost:5000 in your browser.
-API docs at http://localhost:5000/docs
+Open http://localhost:8000 in your browser.
+API docs at http://localhost:8000/docs
 """
 
 import argparse
@@ -16,6 +16,13 @@ import sys
 import os
 import webbrowser
 import uvicorn
+import threading
+
+from src.data_collection.location_service import (
+            check_location_permission,
+            trigger_permission_prompt,
+            wait_for_location_permission,
+        )
 
 
 def preflight_location_permission():
@@ -29,17 +36,10 @@ def preflight_location_permission():
     2. Check the current status.
     3. If not yet granted, print step-by-step instructions and wait for
        the user to toggle it on in System Settings.
+
+    Returns:
+        bool: True if permission is granted or skipped, False if denied.
     """
-    try:
-        from src.data_collection.location_service import (
-            check_location_permission,
-            trigger_permission_prompt,
-            wait_for_location_permission,
-        )
-    except ImportError:
-        print("[Preflight] Could not import location_service (pyobjc not installed?).")
-        print("[Preflight] Continuing without location support.\n")
-        return True
 
     status = check_location_permission()
 
@@ -95,8 +95,18 @@ def preflight_location_permission():
     print("[Preflight] Continuing anyway — scans will work but without GPS coordinates.\n")
     return True
 
-
-def main():
+def parse_args():
+    """
+    Parse command-line arguments.
+    
+    Returns:
+        argparse.Namespace: Parsed arguments with attributes:
+            - models_dir (str): Directory containing trained .pkl models.
+            - db (str): Path to SQLite database for demo mode.
+            - port (int): Port to run the server on.
+            - interval (int): WiFi scan interval in seconds.
+            - skip_location (bool): Whether to skip the location permission preflight check.    
+    """
     parser = argparse.ArgumentParser(description="Indoor Position Tracker")
     parser.add_argument(
         "--models-dir", type=str, default="models",
@@ -107,8 +117,8 @@ def main():
         help="Path to SQLite database for demo mode (default: data/raw/wifi_scans.db)"
     )
     parser.add_argument(
-        "--port", type=int, default=5000,
-        help="Port to run the server on (default: 5000)"
+        "--port", type=int, default=8000,
+        help="Port to run the server on (default: 8000)"
     )
     parser.add_argument(
         "--interval", type=int, default=3,
@@ -118,7 +128,10 @@ def main():
         "--skip-location", action="store_true",
         help="Skip the location permission preflight check"
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
 
     # Resolve paths relative to working directory
     models_dir = os.path.abspath(args.models_dir)
@@ -148,7 +161,6 @@ def main():
     print("=" * 55)
 
     # Open browser after short delay
-    import threading
     threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{args.port}")).start()
 
     # Start server
